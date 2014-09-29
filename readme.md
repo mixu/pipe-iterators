@@ -2,6 +2,10 @@
 
 Functions for iterating over object mode streams.
 
+# Installation
+
+    npm install --save pipe-iterators
+
 # API
 
 The API is analoguous to the native `Array.*` iteration API (`forEach`, `map`, `filter`). All the functions return object mode streams.
@@ -28,40 +32,51 @@ When calling `fork`, keep in mind that `.pipe()` returns the last stream's objec
 
 ## Examples
 
+Preamble:
+
+```js
+var pi = require('pipe-iterators');
+```
+
 Log every item:
 
 ```js
-.pipe(forEach(function(obj) { console.log(obj); }))
+pi.fromArray(['a', 'b', 'c'])
+  .pipe(pi.forEach(function(obj) { console.log(obj); }));
 ```
 
 Set defaults:
     
 ```js
-.pipe(map(function(obj) { return _.defaults(obj, source); }));
+pi.fromArray([{ a: 'a' }, { b: 'b' }, { c: 'c' }])
+  .pipe(pi.map(function(obj) { return _.defaults(obj, { foo: 'bar' }); }));
 ```
 
 Convert to string:
 
 ```js
-.pipe(map(function(chunk) { return chunk.toString()); }));    
+.pipe(pi.map(function(chunk) { return chunk.toString()); }));    
 ```
 
 Append or prepend a value:
 
 ```js
-.pipe(map(function(chunk) { return chunk + '!!' }))
+pi.fromArray(['a', 'b', 'c'])
+  .pipe(pi.map(function(chunk) { return chunk + '!!' }));
 ```
 
 Join chunks:
 
 ```js
-.pipe(reduce(function(prev, chunk) { return prev + '|' + chunk; }), '');
+pi.fromArray(['a', 'b', 'c'])
+  .pipe(pi.reduce(function(prev, chunk) { return prev + '|' + chunk; }, ''));
 ```
 
 Replace the value in the `path` key:
 
 ```js
-.pipe(mapKey('path', function(p) { return p.replace(assetPath, outPath); }))
+pi.fromArray([{ path: '/a/a' }, { path: '/a/b' }, { path: '/a/c' }])
+  .pipe(pi.mapKey('path', function(p) { return p.replace('/a/', '/some/'); }));
 ```
 
 ## What about asynchronous iteration?
