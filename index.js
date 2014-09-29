@@ -1,5 +1,6 @@
 var through = require('through2'),
-    cloneLib = require('clone');
+    cloneLib = require('clone'),
+    Readable = require('readable-stream').Readable;
 
 function forEach(fn) {
   return through.obj(function(obj, enc, onDone) {
@@ -44,6 +45,17 @@ function mapKey(key, fn) {
   }
 }
 
+function reduce(fn, initial) {
+  var acc = initial;
+  return through.obj(function(obj, enc, onDone) {
+    acc = fn(acc, obj);
+    onDone();
+  }, function(onDone) {
+    this.push(acc);
+    onDone();
+  });
+}
+
 function clone() {
   return map(cloneLib);
 }
@@ -68,12 +80,46 @@ function pipeFirst() {
   return first;
 }
 
+// Readable stream wrapper
+require('util').inherits(ArrWrapper, Readable);
+
+function ArrWrapper(opts) {
+  this._arr = opts.arr;
+  Readable.call(this, opts);
+}
+
+ArrWrapper.prototype._read = function() {
+  var item;
+  if (this._arr.length > 0) {
+    while (item = this._arr.shift()) {
+      this.push(item);
+    }
+    // pushing null signals EOF
+    this.push(null);
+  }
+};
+
+function fromArray(arr) {
+  return new ArrWrapper({ objectMode: true, arr: arr });
+}
+
+function toArray(fn) {
+  var result;
+  return reduce(function(prev, current) { return prev.concat(current); }, [])
+    .once('data', function(r) { result = r; })
+    .once('end', function(err) { fn(err, result); });
+}
+
 module.exports = {
   forEach: forEach,
   map: map,
   filter: filter,
   mapKey: mapKey,
+  reduce: reduce,
+  fromArray: fromArray,
+  toArray: toArray,
   clone: clone,
   fork: fork,
-  pipeFirst: pipeFirst
+  pipeFirst: pipeFirst,
+  through: through
 };
