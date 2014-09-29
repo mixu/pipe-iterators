@@ -1,6 +1,6 @@
 {
   "name": "pipe-iterators",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Functions for iterating over object mode streams.",
   "main": "index.js",
   "scripts": {
