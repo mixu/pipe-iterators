@@ -26,18 +26,22 @@ function filter(fn) {
   });
 }
 
-function mapKey(key, fn) {
-  if (typeof key === 'string' && typeof fn === 'function') {
+function mapKey(first, fn) {
+  if (typeof first === 'string' && typeof fn === 'function') {
     return through.obj(function(obj, enc, onDone) {
-      obj[key] = fn(obj[key]);
+      obj[first] = fn(obj[first], obj);
       this.push(obj);
       onDone();
     });
-  } else if (typeof key === 'object' && key !== null) {
+  } else if (typeof first === 'object' && first !== null) {
     return through.obj(function(obj, enc, onDone) {
-      Object.keys(key).forEach(function(key) {
-        fn = key[key];
-        obj[key] = fn(obj[key]);
+      Object.keys(first).forEach(function(key) {
+        fn = first[key];
+        if (typeof fn === 'function') {
+          obj[key] = fn(obj[key], obj);
+        } else {
+          obj[key] = fn;
+        }
       });
       this.push(obj);
       onDone();
@@ -105,9 +109,33 @@ function fromArray(arr) {
 
 function toArray(fn) {
   var result;
+
+  // FIXME: make this a writable, not a duplex stream!
+
   return reduce(function(prev, current) { return prev.concat(current); }, [])
     .once('data', function(r) { result = r; })
     .once('end', function(err) { fn(err, result); });
+}
+
+
+var Writable = require('readable-stream').Writable;
+
+require('util').inherits(DevNull, Writable);
+
+function DevNull(opts) {
+  if (!opts) {
+    opts = {};
+  }
+  opts.objectMode = true;
+  Writable.call(this, opts);
+}
+
+DevNull.prototype._write = function(chunk, enc, onDone) {
+  onDone();
+};
+
+function devnull() {
+  return new DevNull();
 }
 
 module.exports = {
@@ -121,5 +149,6 @@ module.exports = {
   clone: clone,
   fork: fork,
   pipeFirst: pipeFirst,
+  devnull: devnull,
   through: through
 };
