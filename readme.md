@@ -1,6 +1,6 @@
 # pipe-iterators
 
-Functions for iterating over object mode streams.
+Functions for iterating over object mode streams: `forEach`, `map`, `mapKey`, `reduce`, `filter`, `fromArray`, `toArray`, `devnull`, `pipe`, `head`, `tail`, `pipe`, `through`, `thru`, `writable`, `readable`, `duplex`, `pipeline`.
 
 # Installation
 
@@ -14,7 +14,7 @@ var pi = require('pipe-iterators');
 
 ## Iteration functions
 
-The API is analoguous to the native `Array.*` iteration API (`forEach`, `map`, `filter`). All the functions return object mode streams.
+The iterator functions closely follow the native `Array.*` iteration API (e.g. `forEach`, `map`, `filter`), but the functions return object mode streams instead of operating on arrays.
 
 ### forEach
 
@@ -22,14 +22,9 @@ The API is analoguous to the native `Array.*` iteration API (`forEach`, `map`, `
 pi.forEach(callback, [thisArg])
 ```
 
-Calls a function for each element in the stream. `callback` is invoked with two arguments:
+Returns a duplex stream which calls a function for each element in the stream. `callback` is invoked with two arguments - `obj` (the element value) and `index` (the element index). The return value from the callback is ignored. 
 
-- the element value
-- the element index
-
-The return value from the callback is ignored. If `thisArg` is provided, it is available as `this` within the callback.
-
-- `forEach(function(obj) {})`: returns a stream that iterates over every element in the stream and passes through every element. 
+If `thisArg` is provided, it is available as `this` within the callback.
 
 ```js
 pi.fromArray(['a', 'b', 'c'])
@@ -42,13 +37,44 @@ pi.fromArray(['a', 'b', 'c'])
 pi.map(callback, [thisArg])
 ```
 
-Produces a new stream of values by mapping each value in the stream through a transformation callback. The callback is invoked with two arguments, the element value and the element index. 
+Returns a duplex stream which produces a new stream of values by mapping each value in the stream through a transformation callback. The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). The return value from the callback is written back to the stream. 
 
-The return value from the callback is written back to the stream. If `thisArg` is provided, it is available as `this` within the callback.
+If `thisArg` is provided, it is available as `this` within the callback.
 
 ```js
 pi.fromArray([{ a: 'a' }, { b: 'b' }, { c: 'c' }])
   .pipe(pi.map(function(obj) { return _.defaults(obj, { foo: 'bar' }); }));
+```
+
+### reduce
+
+```js
+pi.reduce(callback, [initialValue])
+```
+
+Reduce returns a duplex stream which boils down a stream of values into a single value. `initialValue` is the initial value of the reduction, and each successive step of it should be returned by the `callback`. The callback is called with three arguments: `prev` (the accumulator value), `curr` (the current value) and `index` (the index).
+
+When the input stream ends, the stream emits the value in the accumulator.
+
+If `initialValue` is not provided, then `prev` will be equal to the first value in the array and `curr` will be equal to the second on the first call. 
+
+```js
+pi.fromArray(['a', 'b', 'c'])
+  pipe(pi.reduce(function(posts, post) { return posts.concat(post); }, []));
+```
+
+### filter
+
+```js
+pi.filter(callback, [thisArg])
+```
+
+Returns a duplex stream which writes all values that pass (return `true` for) the test implemented by the provided `callback` function.
+
+The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). If the callback returns `true`, the element is written to the next stream, otherwise the element is filtered out. 
+
+```js
+pi.filter(function(post) { return !post.draft; })
 ```
 
 ### mapKey
@@ -58,54 +84,30 @@ pi.mapKey(key, callback, [thisArg])
 pi.mapKey(hash, [thisArg])
 ```
 
-Produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with two arguments: the value of  `element[key]`, and the element itself.
+Returns a duplex stream which produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with two arguments: `value` (the value `element[key]`), and `obj` (the element itself). The return value from the callback is set on the element, and the element itself is written back to the stream. 
 
-The return value from the callback is set on the element, and the element itself is written back to the stream. If `thisArg` is provided, it is available as `this` within the callback.
-
-- `mapKey(key, function(value, obj) {})`: takes `obj[key]`, and calls the function with this value; the second argument is the full object. The return value from the function replaces the old value of `obj[key]`.
-- `mapKey(hash)`: you can also specify a `key => fn` hash. You can also specify a value that this not a function, in which case it is simply assigned as the new value.
+If `thisArg` is provided, it is available as `this` within the callback.
 
 ```js
 pi.fromArray([{ path: '/a/a' }, { path: '/a/b' }, { path: '/a/c' }])
   .pipe(pi.mapKey('path', function(p) { return p.replace('/a/', '/some/'); }));
 ```
 
-### reduce
+You can also call the `mapKey` with a hash:
 
 ```js
-pipe(pi.reduce(callback, [initialValue]))
+pi.mapKey({
+  a: function(value) { /* ... */},
+  b: 'str',
+  c: true
+})
 ```
 
-Reduce boils down a stream of values into a single value. `initialValue` is the initial value of the reduction, and each successive step of it should be returned by the callback. The callback is called with three arguments: the previous (or initial) value, the current value and the index.
-
-- `reduce(function(prev, obj){}, initial)`: returns a stream that accumulates all of the input, applying the given callback on each entry and storing the return value from the callback as the new value of the accumulator. When the input stream ends, emits the value built up in the accumulator.
-
-```js
-pi.reduce(function(posts, post) { return posts.concat(post); }, []),
-```
-
-
-### reduceRight
-
-```js
-
-```
-
-### filter
-
-```js
-pipe(pi.filter(callback, [thisArg]))
-```
-
-Looks through each value in the stream, writing all the values that pass a truth test defined by `callback`.
-
-- `filter(function(obj) {})`: returns a stream that iterates over every element in the stream. If the return value from the callback function is `false`, then the current element is filtered (not written to the next stream). If the return value is `true`, the element is written to the next stream.
-
-```js
-pi.filter(function(post) { return !post.draft; })
-```
+Each key in the hash is replaced with the return value of the function in the hash. When the value in the hash is not a function, it is simply assigned as the new value for that key.
 
 ## Input and output
+
+These utility functions make it easy to provide input into a stream or capture output from a stream.
 
 ### fromArray
 
@@ -113,17 +115,43 @@ pi.filter(function(post) { return !post.draft; })
 pi.fromArray(arr)
 ```
 
-- `fromArray(arr)`: constructs a readable stream from an array. The stream will emit one item for each item in the array, and then emit end.
+Returns a readable stream given an array. The stream will emit one item for each item in the array, and then emit end.
 
 ### toArray
 
 ```js
-.pipe(pi.toArray(callback))
+pi.toArray(callback)
+pi.toArray(array)
 ```
 
-Returns an instance of a writable stream which captures all of the input. The `callback` is invoked with an array containing every element in the stream when the stream emits `end`.
+Returns a writable stream which buffers the input it receives into an array. When the stream emits `end`, the `callback` is called with one parameter - the array which contains the input elements written to the the stream.
 
-- `toArray(function(err, arr) {})`: constructs a duplex stream which reads in a set of values, places them in a single array and then finally calls the given function, passing in the `err` (any stream errors) and `arr` (containing all the values in a single array). Since this is a duplex stream you can pipe from it as well, and it will write the array it receives after it receives the end event.
+You can also pass an instance of an array instead of a callback. The array's contents will be updated with the elements from the stream when the writable stream emits `finish`.
+
+## Constructing streams
+
+### thru & through
+
+Both of these functions return the `through2` module's function, which can be used to construct Transform streams.
+
+- `.through`: exposes the [through2](https://github.com/rvagg/through2) instance used, may be useful if you are using through2 anyway.
+
+### writable
+
+### readable
+
+### duplex
+
+```js
+var child = require('child_process').spawn('wc', ['-c']);
+pi.fromArray(['a', 'b', 'c'])
+  .pipe(pi.duplex(child.stdin, child.stdout))
+  .pipe(process.stdout);
+```
+
+Takes a readable stream and a writable stream and returns a duplex stream. Note that the two streams are not piped together or otherwise altered. Actually returns a wrapper which redirects method calls to the readable / writable stream as appropriate.
+
+TODO: Listening for 'error' will recieve errors from all streams inside the pipe.
 
 ### devnull
 
@@ -131,99 +159,133 @@ Returns an instance of a writable stream which captures all of the input. The `c
 pi.devnull()
 ```
 
-Returns an instance of a writable stream which consumes any input and produces no output. Useful for executing pipelines consisting of duplex (through) streams when you want to ensure that the last step in the pipeline fully consumes the output coming into the pipeline.
+Returns a writable stream which consumes any input and produces no output. Useful for consuming output from duplex streams when prototyping or when you want to run the processing but discard the final output.
+
+### clone
+
+```js
+pi.clone()
+```
+
+Returns a duplex stream. Inputs written to the stream are cloned and then written out. This is useful if you need to ensure that concurrent modifications to objects written into multiple streams do not influence each other.
 
 ## Control flow
+
+These functions allow you to write more advanced streams, going from one linear sequence of transformation steps to multiple pipelines.
 
 ### fork
 
 ```js
-pi.fork(stream1, stream2, stream3)
+pi.fork(stream1, [stream2], [...])
+pi.fork([ stream1, stream2, ... ])
 ```
 
-Create an instance of a duplex stream
+Returns a writable stream. Inputs written to the stream are written to all of the streams passed as arguments to `fork`.
 
-- `fork(stream1, stream2, ...)`: returns a duplex stream. The stream is piped into the streams passed as arguments. Every forked stream receives a clone of the original input object. Cloning prevents annoying issues that might occur when one fork stream modifies an object that is shared among multiple forked streams.
-- `fork([stream1, stream2, ...])`: you can also pass an array
+Every forked stream receives a clone of the original input object. Cloning prevents annoying issues that might occur when one fork stream modifies an object that is shared among multiple forked streams.
+
+Also accepts a single array of streams as the first parameter. 
+
+### match
+
+```js
+pi.match(condition1, stream1, [condition2], [stream2], [...], [rest])
+pi.match([ condition1, stream1, condition2, stream2, ..., rest ])
+```
+
+Allows you to construct `if-else` style conditionals which split a stream into multiple substreams based on a condition.
+
+Returns a writable stream given a series of `condition` function and `stream` pairs. When elements are written to the stream, they are matched against each condition function in order. 
+
+The `condition` function is called with two arguments - `obj` (the element value) and `index` (the element index). If the condition returns `true`, the element is written to the associated stream and no further matches are performed.
+
+The last argument to `match` is optional. It can be a stream without a preceding condition function, and any elements not matching the other conditions will be written into it.
+
+
+```js
+pi.fromArray([
+  { url: '/people' }, 
+  { url: '/posts/1' }, { url: '/posts' },
+  { url: '/comments/2' }])
+  .pipe(pi.match(
+    function(req) { return /^\/people.*$/.test(req.url); },
+    pi.pipeline(
+        pi.forEach(function(obj) { console.log('person!', obj); }), 
+        pi.devNull()
+    ),
+    function(req) { return /^\/posts.*$/.test(req.url); },
+    pi.pipeline(
+        pi.forEach(function(obj) { console.log('post!', obj); }), 
+        pi.devNull()
+    ),
+    pi.pipeline(
+        pi.forEach(function(obj) { console.log('other:', obj); }), 
+        pi.devNull()
+    )
+  ));
+```
+
+TODO: Listening for 'error' will recieve errors from all streams inside the pipe.
+
+
+## Constructing pipelines from individual elements
+
+These functions apply `pipe` in various ways to make it easier to go from an array of streams to a pipeline.
+
+### pipe()
+
+```js
+pi.pipe(stream1, [stream2], [...])
+pi.pipe([ stream1, stream2, ...])
+```
+
+Given a series of streams, calls `.pipe()` for each stream in sequence and returns an array which contains all the streams. Used by `head()` and `tail()`.
+
+Also accepts a single array of streams as the first parameter. 
 
 ### head()
 
 ```js
-pi.head(stream1, stream2, stream3)
+pi.head(stream1, [stream2], [...])
+pi.head([ stream1, stream2, ... ])
 ```
 
-Calls `.pipe()` on every stream, constructing a pipeline. Almost like `a.pipe(b).pipe(c)`, but  `.head()` returns the first stream (`a`) rather than the last stream (`c`). The equivalent without `.head` would be:
+Given a series of streams, calls `.pipe()` for each stream in sequence and returns the first stream in the series.
 
-```js
-(function() {
-    var head = a;
-    a.pipe(b).pipe(c);
-    return head;
-}())
-```
+Also accepts a single array of streams as the first parameter. 
+
+Similar to `a.pipe(b).pipe(c)`, but `.head()` returns the first stream (`a`) rather than the last stream (`c`). 
 
 ### tail()
 
 ```js
-pi.tail(stream1, stream2, stream3)
+pi.tail(stream1, [stream2], [...])
+pi.tail([ stream1, stream2, ... ])
 ```
 
-Calls `.pipe` on every stream, constructing a pipeline. Returns the last stream; just like calling `stream1.pipe(stream2).pipe(stream3)`.
+Given a series of streams, calls `.pipe()` for each stream in sequence and returns the last stream in the series.
+
+Also accepts a single array of streams as the first parameter. 
+
+Just like calling `a.pipe(b).pipe(c)`.
 
 ### pipeline
 
 ```js
-pi.pipeline(stream1, [ inStream, ..., outStream], stream2, ...)
+pi.pipeline(stream1, stream2, ...)
+pi.pipeline([ stream1, stream2, ... ])
 ```
 
-- `.pipeFirst(stream1, stream2, ...)`: 
-- `.pipeFirst([stream1, stream2, ...])`: you can also pass an array.
+Constructs a pipeline from a series of streams. Always returns a single stream object, which is either duplex or writable. Pipelines are series of streams that either:
 
-When calling `fork`, keep in mind that `.pipe()` returns the last stream's object, so you probably want to use `.pipeFirst(stream1, stream2, ...)`, since `.fork(a.pipe(b).pipe(c))` would be equivalent to `.fork(c)` and not `.fork(a)` because of how `.pipe` works.
+- start with a duplex stream and end with a duplex stream or
+- start with a duplex stream and end with a writable stream
 
-#### Use case for pipeline
+Given a pipeline that starts with a duplex stream and ends with a duplex stream, `pipeline` returns a single duplex stream in which any writes go the first stream and any reads/pipes etc. are done from the last stream.
 
-As you start building a larger pipeline, there are several annoyances with the standard `.pipe` which `.pipeline` resolves.
+Normally, when just manually applying `pipe` you have to pick whether to return the first stream or the last stream in the pipeline. Returning the first stream has the benefit that writes to it will correctly go into the pipeline, but of course any reads/pipes from it will skip the rest of the pipeline. Returning the last stream has the opposite problem: you can read from the pipeline but cannot pipe to the first stream anymore. With `pipeline` you don't need to choose, since the return result works as you would expect.
 
-- first, writing `.pipe()` for each step in the pipeline gets a bit tedious
-- second, it is hard to write modules that return pipelines because you want to write to the first stream in the array but read from the last stream in the array.
-
-For example, this will break: `input.pipe(pi.fork(a.pipe(a2).pipe(a3), b))` - because `a.pipe(a2).pipe(a3)` returns `a3` when what you probably want is `a`.
-
-With pipeline you can write this as: 
-
-```js
-input.pipe(pi.fork(pi.pipeline(a, a2, a3), b));
-```
-
-You could use a temporary variable to write:
-
-```js
-var head = a;
-a.pipe(a2).pipe(a3);
-input.pipe(pi.fork(head, b));
-```
-
-but this is ugly.
-
-Second, imagine that you want to have a module with a function that returns a pipeline. You can't write:
-
-```js
-module.exports = function() {
-  var head = a;
-  a.pipe(a2).pipe(a3);
-  return head;    
-};
-```
-
-because the return value is not usable with `.pipe`:
-
-```js
-var myPipeline = require('./my-pipeline');
-input.pipe(myPipeline).pipe(b);
-```
-
-because `myPipeline` returns `head` - and hence this is equivalent to `input.pipe(head).pipe(b)` when what you would want is: `input.pipe(head).pipe(a2).pipe(a3).pipe(b)`. 
+Given a pipeline that starts with a duplex stream and ends with a writable stream, `pipeline` returns a single writable stream in which any writes go the first stream. Since the last stream in the pipeline is writable but not readable, the pipeline is also only writable but not readable. This helps stop errors where you accidentally pipe the first stream of a pipeline out (which will not work as expected since outputs do not pass through the whole pipeline).
 
 With `.pipeline()`, writes into the return value go to the first stream but reads (and pipe calls) are applied to the last value in the stream:
 
@@ -234,48 +296,6 @@ module.exports = function() {
 ```
 
 works as expected and `input.pipe(myPipeline).pipe(b)` writes to `a` but reads from `a3`.
-
-
-
-
-
-# API
-
-
-TODO: context object argument support - should default to the through stream.
-TODO: .pipe() should do the right thing given .pipe([ foo, [ first, ..., last], bar); this would probably reduce the number of calls needed to pipeFirst. Also, maybe it should be called `head([ pipeline])` (or `first([pl])`)
-
-
-Note that the forEach/map/filter callbacks only receive one argument - the value from the stream - which means that you can probably just write `.map(someLibFn)` directly without worrying about `someLibFn` getting extra arguments.
-
-- `.through`: exposes the [through2](https://github.com/rvagg/through2) instance used, may be useful if you are using through2 anyway.
-- `clone()`: returns a stream that clones each of the input values before writing them forward.
-
-
-## Examples
-
-  
-
-Convert to string:
-
-```js
-.pipe(pi.map(function(chunk) { return chunk.toString()); }));    
-```
-
-Append or prepend a value:
-
-```js
-pi.fromArray(['a', 'b', 'c'])
-  .pipe(pi.map(function(chunk) { return chunk + '!!' }));
-```
-
-Join chunks:
-
-```js
-pi.fromArray(['a', 'b', 'c'])
-  .pipe(pi.reduce(function(prev, chunk) { return prev + '|' + chunk; }, ''));
-```
-
 
 ## What about asynchronous iteration?
 
@@ -290,3 +310,9 @@ Best handled by something that can do that in an efficient manner, such as [bina
 - [Raynos/duplexer](https://github.com/Raynos/duplexer)
 - [dominictarr/event-stream](https://github.com/dominictarr/event-stream)
 - [Medium/sculpt](https://github.com/Medium/sculpt)
+- Duplexing:
+  - [deoxxa/duplexer2](https://github.com/deoxxa/duplexer2)
+  - [naomik/bun](https://github.com/naomik/bun)
+  - [KylePDavis/node-stream-utils](https://github.com/KylePDavis/node-stream-utils): duplex() for old (0.8.x) style streams
+  - [sterpe/composite-pipes](https://github.com/sterpe/composite-pipes)
+- [rvagg/isstream](https://github.com/rvagg/isstream)

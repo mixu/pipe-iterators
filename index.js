@@ -1,44 +1,56 @@
 var through = require('through2'),
-    cloneLib = require('clone'),
-    Readable = require('readable-stream').Readable;
+    cloneLib = require('clone');
 
-function forEach(fn) {
+var DevNull = require('./lib/dev-null.js'),
+    duplex = require('./lib/duplex.js'),
+    FromArr = require('./lib/from-arr.js')
+    ToArr = require('./lib/to-arr'),
+    Match = require('./lib/match.js');
+
+exports.forEach = function(fn, thisArg) {
+  var index = 0;
+  thisArg = (typeof thisArg !== 'undefined' ? thisArg : null);
   return through.obj(function(obj, enc, onDone) {
-    fn(obj);
+    fn.call(thisArg, obj, index++);
     this.push(obj);
     onDone();
   });
 }
 
-function map(fn) {
+exports.map = function(fn, thisArg) {
+  var index = 0;
+  thisArg = (typeof thisArg !== 'undefined' ? thisArg : null);
   return through.obj(function(obj, enc, onDone) {
-    this.push(fn(obj));
+    this.push(fn.call(thisArg, obj, index++));
     onDone();
   });
 }
 
-function filter(fn) {
+exports.filter = function(fn, thisArg) {
+  var index = 0;
+  thisArg = (typeof thisArg !== 'undefined' ? thisArg : null);
   return through.obj(function(obj, enc, onDone) {
-    if (fn(obj)) {
-      this.push(obj);
-    }
+    if (fn.call(thisArg, obj, index++)) { this.push(obj); }
     onDone();
   });
 }
 
-function mapKey(first, fn) {
+exports.mapKey = function(first, fn, thisArg) {
+  var index = 0;
   if (typeof first === 'string' && typeof fn === 'function') {
+    thisArg = (typeof thisArg !== 'undefined' ? thisArg : null);
     return through.obj(function(obj, enc, onDone) {
-      obj[first] = fn(obj[first], obj);
+      obj[first] = fn.call(thisArg, obj[first], obj, index++);
       this.push(obj);
       onDone();
     });
   } else if (typeof first === 'object' && first !== null) {
+    thisArg = (typeof fn !== 'undefined' ? fn : null);
     return through.obj(function(obj, enc, onDone) {
       Object.keys(first).forEach(function(key) {
         fn = first[key];
         if (typeof fn === 'function') {
-          obj[key] = fn(obj[key], obj);
+          obj[key] = fn.call(thisArg, obj[key], obj, index++);
         } else {
           obj[key] = fn;
         }
@@ -46,13 +58,23 @@ function mapKey(first, fn) {
       this.push(obj);
       onDone();
     });
+  } else {
+    throw new Error('mapKey must be called with: (key, fn) or (hash).');
   }
 }
 
-function reduce(fn, initial) {
-  var acc = initial;
+exports.reduce = function(fn, initial) {
+  var index = 0,
+      captureFirst = (arguments.length < 2),
+      acc = (!captureFirst ? initial : null);
   return through.obj(function(obj, enc, onDone) {
-    acc = fn(acc, obj);
+    if (captureFirst) {
+      acc = obj;
+      captureFirst = false;
+      index++;
+    } else {
+      acc = fn(acc, obj, index++);
+    }
     onDone();
   }, function(onDone) {
     this.push(acc);
@@ -60,11 +82,11 @@ function reduce(fn, initial) {
   });
 }
 
-function clone() {
+exports.clone = function() {
   return map(cloneLib);
 }
 
-function fork() {
+exports.fork = function() {
   var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments)),
       result = through.obj();
   args.forEach(function(target) {
@@ -75,80 +97,67 @@ function fork() {
   return result;
 }
 
-function pipeFirst() {
+exports.pipe = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  args.reduce(function(prev, curr) { return prev.pipe(curr); });
+  return args;
+}
+
+exports.head = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  return exports.pipe(args)[0];
+};
+
+exports.tail = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  return exports.pipe(args).pop();
+};
+
+exports.match = function() {
   var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments)),
-      first = args.shift();
-  args.reduce(function(prev, curr) {
-    return prev.pipe(curr);
-  }, first);
-  return first;
-}
+      conditions = [],
+      streams = [],
+      i = 0;
 
-// Readable stream wrapper
-require('util').inherits(ArrWrapper, Readable);
-
-function ArrWrapper(opts) {
-  this._arr = opts.arr;
-  Readable.call(this, opts);
-}
-
-ArrWrapper.prototype._read = function() {
-  var item;
-  if (this._arr.length > 0) {
-    while (item = this._arr.shift()) {
-      this.push(item);
-    }
-    // pushing null signals EOF
-    this.push(null);
+  while (i < args.length) {
+    if (typeof args[i] === 'function' && typeof args[i + 1] === 'object') {
+      conditions.push(args[i]);
+      streams.push(args[i + 1]);
+      i += 2;
+    } else { break; }
   }
+
+  return new Match({
+    objectMode: true,
+    conditions: conditions,
+    streams: streams
+  });
 };
 
-function fromArray(arr) {
-  return new ArrWrapper({ objectMode: true, arr: arr });
-}
-
-function toArray(fn) {
-  var result;
-
-  // FIXME: make this a writable, not a duplex stream!
-
-  return reduce(function(prev, current) { return prev.concat(current); }, [])
-    .once('data', function(r) { result = r; })
-    .once('end', function(err) { fn(err, result); });
-}
-
-
-var Writable = require('readable-stream').Writable;
-
-require('util').inherits(DevNull, Writable);
-
-function DevNull(opts) {
-  if (!opts) {
-    opts = {};
+exports.devnull = function(endFn) {
+  var result = new DevNull();
+  if (endFn) {
+    result.once('finish', endFn);
   }
-  opts.objectMode = true;
-  Writable.call(this, opts);
-}
+  return result;
+};
+exports.fromArray = function(arr) { return new FromArr({ objectMode: true, arr: arr }); };
+exports.toArray = function(fn) { return new ToArr({ objectMode: true, fn: fn }); };
+exports.duplex = duplex;
+exports.thru = exports.through = through;
 
-DevNull.prototype._write = function(chunk, enc, onDone) {
-  onDone();
+// TODO:
+// - add writable(fn)
+// - add readable(fn, fn)
+
+exports.pipeline = function() {
+
+  // iterate and construct duplex pipelines from arrays (deep)
+
+  // finally construct the top level duplex stream
+
+
+  var streams = exports.pipe(Array.prototype.slice.call(arguments));
+  return duplex(streams[0], streams[streams.length - 1]);
 };
 
-function devnull() {
-  return new DevNull();
-}
-
-module.exports = {
-  forEach: forEach,
-  map: map,
-  filter: filter,
-  mapKey: mapKey,
-  reduce: reduce,
-  fromArray: fromArray,
-  toArray: toArray,
-  clone: clone,
-  fork: fork,
-  pipeFirst: pipeFirst,
-  devnull: devnull,
-  through: through
-};
