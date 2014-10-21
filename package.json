@@ -26,6 +26,6 @@
     "clone": "0.1.18",
     "readable-stream": "*",
     "through2": "*",
-    "xtend": "^4.0.0"
+    "xtend": "4.0.0"
   }
 }
