@@ -153,51 +153,69 @@ Returns a Transform stream given a set of `options`, a `transformFn` and `flushF
 ### writable
 
 ```js
-pi.writable([options], [writeFn]);
-pi.writable.obj([writeFn]);
-pi.writable.ctor([options], [writeFn]);
+pi.writable([options], writeFn)
+pi.writable.obj(writeFn)
+pi.writable.ctor([options], writeFn)
 ```
 
 Returns a Writable stream given a set of `options` and a `writeFn`.
 
 Has the same options as `thru`:
 
-- The `options` hash is passed to `stream.Writable` to construct the stream.
-- The `writeFn` has the signature: ``
-- `writable.obj` is a convenience wrapper for `writable({ objectMode: true })`.
-- `writable.ctor()` returns a constructor for the writable stream.
+- The `options` hash is passed to `stream.Writable` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_writable_options).
+- The `writeFn` has the signature: `function(chunk, encoding, callback) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_writable_write_chunk_encoding_callback_1) for details.
+- `writable.obj()` is a convenience wrapper for `writable({ objectMode: true })`.
+- `writable.ctor()` returns a constructor for the writable stream. 
 
 ### readable
 
 ```js
-pi.readable([options], [readFn]);
-pi.readable.obj([readFn]);
-pi.readable.ctor([options], [readFn]);
+pi.readable([options], [readFn])
+pi.readable.obj([readFn])
+pi.readable.ctor([options], [readFn])
 ```
 
-Returns a Writable stream given a set of `options` and a `writeFn`.
+Returns a Readable stream given a set of `options` and a `readFn`.
 
 Has the same options as `thru`:
 
-- The `options` hash is passed to `stream.Writable` to construct the stream.
-- The `writeFn` has the signature: ``
-- `writable.obj` is a convenience wrapper for `writable({ objectMode: true })`.
-- `writable.ctor()` returns a constructor for the writable stream.
+- The `options` hash is passed to `stream.Readable` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_readable_options).
+- The `readFn` has the signature: `function(size) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_readable_read_size_1) for details.
+- `readable.obj()` is a convenience wrapper for `readable({ objectMode: true })`.
+- `readable.ctor()` returns a constructor for the readable stream.
 
 ### duplex
 
 ```js
-pi.duplex(writableStream, readableStream);
+pi.duplex([options], writeFn, readFn)
+pi.duplex.obj(writeFn, readFn)
+pi.duplex.ctor([options], writeFn, readFn)
+```
+
+Returns a Duplex stream given a set of `options`, a `writeFn` and a `readFn`.
+
+Has the same options as `thru`:
+
+- The `options` hash is passed to `stream.Duplex` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_duplex_options).
+- The `writeFn` has the signature: `function(chunk, encoding, callback) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_writable_write_chunk_encoding_callback_1) for details. 
+- The `readFn` has the signature: `function(size) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_readable_read_size_1) for details.
+- `duplex.obj()` is a convenience wrapper for `duplex({ objectMode: true })`.
+- `duplex.ctor()` returns a constructor for the duplex stream.
+
+### combine
+
+```js
+pi.combine(writableStream, readableStream)
 ```
 
 Takes a readable stream and a writable stream and returns a duplex stream. 
 
-Note: the two streams ARE NOT piped together. If you want to construct a pipeline with multiple streams, you can, but you need to perform the pipe operations yourself (or use the `.pipeline` function instead). This makes `.duplex` work with streams where the connections is not via a pipe mechanism, like with `child_process.spawn`:
+Note: the two streams ARE NOT piped together. If you want to construct a pipeline with multiple streams, you can, but you need to perform the pipe operations yourself (or use the `.pipeline` function instead). This makes `.combine` work with streams where the connections is not via a pipe mechanism, like with `child_process.spawn`:
 
 ```js
 var child = require('child_process').spawn('wc', ['-c']);
 pi.fromArray(['a', 'b', 'c'])
-  .pipe(pi.duplex(child.stdin, child.stdout))
+  .pipe(pi.combine(child.stdin, child.stdout))
   .pipe(process.stdout);
 ```
 
@@ -210,6 +228,10 @@ pi.devnull()
 ```
 
 Returns a writable stream which consumes any input and produces no output. Useful for consuming output from duplex streams when prototyping or when you want to run the processing but discard the final output.
+
+### cap
+
+
 
 ### clone
 
@@ -345,6 +367,42 @@ module.exports = function() {
 ```
 
 works as expected and `input.pipe(myPipeline).pipe(b)` writes to `a` but reads from `a3`.
+
+### Checking stream instances
+
+These functions are like [rvagg/isstream](https://github.com/rvagg/isstream), but they work correctly on Node 0.8. The main differences are that 1) the 0.8 core streams from things like fs and child_process are correctly detected and 2) the functions use duck typing (checking for conformance to an API) rather than `instanceof` checks which can be problematic in a browser environment or when using modules that are compatible from an API perspective but do not descend from the native `stream`.
+
+#### isStream
+
+```js
+pi.isStream(obj)
+```
+
+Returns true if a stream provides either the Readable stream interface or the Writable stream interface.
+
+#### isReadable
+
+```js
+pi.isReadable(obj)
+```
+
+Returns true if a stream provides the Readable stream interface.
+
+#### isWritable
+
+```js
+pi.isWritable(obj)
+```
+
+Returns true if a stream provides the Writable stream interface.
+
+#### isDuplex
+
+```js
+pi.isDuplext(obj)
+```
+
+Returns true if a stream provides both the Readable and Writable stream interfaces.
 
 ## What about asynchronous iteration?
 

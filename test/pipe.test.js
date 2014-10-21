@@ -1,8 +1,8 @@
 var assert = require('assert'),
     pi = require('../index.js'),
-    isReadable = require('isstream').isReadable,
-    isWritable = require('isstream').isWritable,
-    isDuplex = require('isstream').isDuplex;
+    isReadable = require('../lib/is-stream').isReadable,
+    isWritable = require('../lib/is-stream').isWritable,
+    isDuplex = require('../lib/is-stream').isDuplex;
 
 describe('pipe function tests', function() {
   var dataEvents, endEvents;
@@ -145,10 +145,65 @@ describe('pipe function tests', function() {
 
 describe('pipeline', function() {
 
-  it('throws an error if the first argument is not a readable stream');
+  it('throws an error if the first argument is not a readable stream', function() {
+    assert.throws(function() {
+      var result = pi.pipeline(pi.toArray(), pi.toArray());
+    });
+  });
 
-  it('throws an error if the last argument is not a writable stream');
+  it('throws an error if the last argument is not a writable stream', function() {
+    assert.throws(function() {
+      var result = pi.pipeline(pi.fromArray(1), pi.fromArray(1));
+    });
+  });
 
-  it('throws an error if the first and last streams are the same stream');
+  it('throws an error if the first and last streams are the same stream', function() {
+    assert.throws(function() {
+    var thru = pi.thru();
+      var result = pi.pipeline(thru, thru);
+    });
+  });
+
+  function doubler() {
+    return pi.map(function(x) { return x*2; });
+  }
+
+
+  it('returns a duplex stream given a pipeline that ends with a duplex stream', function(done) {
+    var stream = pi.pipeline(doubler(), doubler(), doubler());
+    assert.ok(isDuplex(stream));
+
+    // writes to the pipeline go to the first stream, reads from the pipeline come from last stream
+    pi.fromArray(1, 2, 3)
+      .pipe(stream)
+      .pipe(pi.toArray(function(results) {
+        assert.deepEqual(results, [ 8, 16, 24 ]);
+        done();
+      }));
+  });
+
+  it('returns a writable stream given a pipeline that ends with a writable stream', function(done) {
+    var stream = pi.pipeline(doubler(), doubler(), pi.toArray(function(results) {
+        assert.deepEqual(results, [ 4, 8, 12 ]);
+        done();
+      }));
+
+    assert.ok(isWritable(stream));
+    assert.ok(!isReadable(stream));
+    // writes to the pipeline go to the first stream
+    pi.fromArray(1, 2, 3).pipe(stream);
+  });
+
+  it('listening on error captures errors emitted in the first stream', function(done) {
+
+  });
+
+  it('listening on error captures errors emitted in the middle stream', function(done) {
+
+  });
+
+
+  xit('listening on error captures errors emitted in the last stream', function(done) {
+  });
 
 });

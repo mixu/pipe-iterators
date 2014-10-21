@@ -1,7 +1,8 @@
 var through = require('through2'),
-    cloneLib = require('clone');
+    cloneLib = require('clone'),
+    Readable = require('readable-stream').Readable;
 
-var duplex = require('./lib/duplex.js'),
+var isStream = require('./lib/is-stream.js'),
     Match = require('./lib/match.js');
 
 // Iteration functions
@@ -126,7 +127,79 @@ exports.toArray = function(fn) {
 exports.thru = exports.through = through;
 exports.writable = require('./lib/writable.js');
 exports.readable = require('./lib/readable.js');
-exports.duplex = duplex;
+exports.duplex = require('./lib/duplex.js');
+
+// based on https://github.com/deoxxa/duplexer2/pull/6
+exports.combine = function(writable, readable) {
+  if (!isStream.isWritable(writable)) {
+    throw new Error('The first stream must be writable.');
+  }
+  if (!isStream.isReadable(readable)) {
+    throw new Error('The last stream must be readable.');
+  }
+  if (writable === readable) {
+    throw new Error('The two streams must not be === to each other.');
+    // ... because it would lead to a bunch of special cases related to duplicate calls
+  }
+
+  // convert node 0.8 readable to 0.10 readable stream
+  if (typeof readable.read !== 'function') {
+    readable = new Readable().wrap(readable);
+  }
+
+  var shouldRead = false,
+      stream = exports.duplex.obj(function(chunk, enc, done) {
+        // Node 0.8.x writable streams do not accept the third parameter, done
+        var ok = writable.write(chunk, enc);
+        if (ok) {
+          done();
+        } else {
+          writable.once('drain', done);
+        }
+      }, function() {
+        if (shouldRead) { return; }
+        shouldRead = true;
+        forwardRead();
+      });
+
+  writable.once('finish', function() { stream.end(); });
+  stream.once('finish', function() { writable.end(); });
+  writable.on('error', function(err) { return stream.emit('error', err); });
+
+  readable.on('readable', forwardRead);
+  readable.once('end', function() { return stream.push(null); });
+  readable.on('error', function(err) { return stream.emit('error', err); });
+
+  function forwardRead() {
+    if (!shouldRead) { return; }
+    var data, waitingToRead = true;
+    while ((data = readable.read()) !== null) {
+      waitingToRead = false;
+      stream.push(data);
+    }
+    shouldRead = waitingToRead;
+  }
+
+  return stream;
+};
+
+exports.cap = function(duplex) {
+  var stream = exports.writable.obj(function(chunk, enc, done) {
+    // Node 0.8.x writable streams do not accept the third parameter, done
+    var ok = duplex.write(chunk, enc);
+    if (ok) {
+      done();
+    } else {
+      duplex.once('drain', done);
+    }
+  });
+
+  duplex.once('finish', function() { stream.end(); });
+  stream.once('finish', function() { duplex.end(); });
+  duplex.on('error', function(err) { return stream.emit('error', err); });
+
+  return stream;
+};
 
 exports.devnull = function(endFn) {
   var result = exports.writable({ objectMode: true });
@@ -185,6 +258,20 @@ exports.match = function() {
 
 exports.pipe = function() {
   var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  if (!isStream.isReadable(args[0])) {
+    throw new Error('First stream must be readable.');
+  }
+
+  if (!isStream.isWritable(args[0])) {
+    throw new Error('Last stream must be writable.');
+  }
+
+  args.slice(1, -1).map(function(stream) {
+    if (!isStream.isDuplex(stream)) {
+      throw new Error('Streams in the pipeline must be duplex.');
+    }
+  });
+
   args.reduce(function(prev, curr) { return prev.pipe(curr); });
   return args;
 }
@@ -200,12 +287,20 @@ exports.tail = function() {
 };
 
 exports.pipeline = function() {
+  var streams = exports.pipe(Array.prototype.slice.call(arguments)),
+      last = streams[streams.length - 1];
 
-  // iterate and construct duplex pipelines from arrays (deep)
+  if (isStream.isDuplex(last)) {
+    return exports.combine(streams[0], last);
+  }
 
-  // finally construct the top level duplex stream
-
-
-  var streams = exports.pipe(Array.prototype.slice.call(arguments));
-  return duplex(streams[0], streams[streams.length - 1]);
+  return exports.cap(streams[0]);
 };
+
+// isStream
+
+exports.isStream = isStream;
+exports.isReadable = isStream.isReadable;
+exports.isWritable = isStream.isWritable;
+exports.isDuplex = isStream.isDuplex;
+

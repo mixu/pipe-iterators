@@ -1,8 +1,8 @@
 var assert = require('assert'),
     pi = require('../index.js'),
-    isReadable = require('isstream').isReadable,
-    isWritable = require('isstream').isWritable,
-    isDuplex = require('isstream').isDuplex;
+    isReadable = require('../lib/is-stream').isReadable,
+    isWritable = require('../lib/is-stream').isWritable,
+    isDuplex = require('../lib/is-stream').isDuplex;
 
 describe('forEach', function() {
 

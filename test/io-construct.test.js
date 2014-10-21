@@ -1,8 +1,8 @@
 var assert = require('assert'),
     pi = require('../index.js'),
-    isReadable = require('isstream').isReadable,
-    isWritable = require('isstream').isWritable,
-    isDuplex = require('isstream').isDuplex,
+    isReadable = require('../lib/is-stream').isReadable,
+    isWritable = require('../lib/is-stream').isWritable,
+    isDuplex = require('../lib/is-stream').isDuplex,
     child_process = require('child_process');
 
 describe('fromArray', function() {
@@ -58,30 +58,30 @@ describe('devnull', function() {
   });
 });
 
-describe('duplex', function() {
+describe('combine', function() {
 
   it('throws an error if the first argument is not a readable stream', function() {
     assert.throws(function() {
-      var result = pi.duplex(pi.toArray(), pi.toArray());
+      var result = pi.combine(pi.toArray(), pi.toArray());
     });
   });
 
   it('throws an error if the last argument is not a writable stream', function() {
     assert.throws(function() {
-      var result = pi.duplex(pi.fromArray(1), pi.fromArray(1));
+      var result = pi.combine(pi.fromArray(1), pi.fromArray(1));
     });
   });
 
   it('throws an error if the first and last streams are the same stream', function() {
     assert.throws(function() {
     var thru = pi.thru();
-      var result = pi.duplex(thru, thru);
+      var result = pi.combine(thru, thru);
     });
   });
 
   it('works with a child process object', function(done) {
     var p = child_process.spawn('wc', ['-c']),
-        stream = pi.duplex(p.stdin, p.stdout);
+        stream = pi.combine(p.stdin, p.stdout);
 
     assert.ok(isReadable(stream));
     assert.ok(isWritable(stream));
@@ -96,7 +96,7 @@ describe('duplex', function() {
   });
 
   it('listening on error captures errors emitted in the first stream', function(done) {
-    var result = pi.duplex(pi.thru.obj(function(chunk, enc, done) {
+    var result = pi.combine(pi.thru.obj(function(chunk, enc, done) {
       this.emit('error', new Error('Expected error'));
       this.push(chunk);
       done();
@@ -110,7 +110,7 @@ describe('duplex', function() {
   });
 
   it('listening on error captures errors emitted in the second stream', function(done) {
-    // note that duplex does NOT pipe the two streams together
+    // note that combine does NOT pipe the two streams together
     var writable = pi.through.obj();
     var readable = pi.through.obj(function(chunk, enc, done) {
       this.emit('error', new Error('Expected error'));
@@ -118,7 +118,7 @@ describe('duplex', function() {
       done();
     });
     writable.pipe(readable);
-    var result = pi.duplex(writable, readable);
+    var result = pi.combine(writable, readable);
 
     result.once('error', function(err) {
       assert.ok(err);
