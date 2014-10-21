@@ -194,16 +194,43 @@ describe('pipeline', function() {
     pi.fromArray(1, 2, 3).pipe(stream);
   });
 
-  it('listening on error captures errors emitted in the first stream', function(done) {
+  function errorStream() {
+    return pi.thru.obj(function(chunk, enc, done) {
+      this.emit('error', new Error('Expected error'));
+      this.push(chunk);
+      done();
+    });
+  }
 
+  it('listening on error captures errors emitted in the first stream', function(done) {
+    var stream = pi.pipeline(errorStream(), pi.thru.obj(), pi.thru.obj());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
+
+    pi.fromArray(1).pipe(stream).pipe(pi.devnull());
   });
 
   it('listening on error captures errors emitted in the middle stream', function(done) {
+    var stream = pi.pipeline(pi.thru.obj(), errorStream(), pi.thru.obj());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
 
+    pi.fromArray(1).pipe(stream).pipe(pi.devnull());
   });
 
 
-  xit('listening on error captures errors emitted in the last stream', function(done) {
+  it('listening on error captures errors emitted in the last stream', function(done) {
+    var stream = pi.pipeline(pi.thru.obj(), pi.thru.obj(), errorStream());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
+
+    pi.fromArray(1).pipe(stream).pipe(pi.devnull());
   });
 
 });

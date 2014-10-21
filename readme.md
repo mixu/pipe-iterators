@@ -231,7 +231,11 @@ Returns a writable stream which consumes any input and produces no output. Usefu
 
 ### cap
 
+```js
+pi.cap(duplex)
+```
 
+Returns a writable stream given a duplex stream. Any input written into the stream is written to the duplex stream.
 
 ### clone
 

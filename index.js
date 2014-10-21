@@ -288,13 +288,16 @@ exports.tail = function() {
 
 exports.pipeline = function() {
   var streams = exports.pipe(Array.prototype.slice.call(arguments)),
-      last = streams[streams.length - 1];
+      last = streams[streams.length - 1],
+      isDuplex = isStream.isDuplex(last),
+      head = isDuplex ? exports.combine(streams[0], last) : exports.cap(streams[0]);
 
-  if (isStream.isDuplex(last)) {
-    return exports.combine(streams[0], last);
-  }
+  // listen to errors in the middle streams (combine already listens to the first and last)
+  streams.slice(1, (isDuplex ? -1 : streams.length)).forEach(function(stream) {
+    stream.on('error', function(err) { head.emit('error', err); });
+  });
 
-  return exports.cap(streams[0]);
+  return head;
 };
 
 // isStream

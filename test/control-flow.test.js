@@ -89,18 +89,44 @@ describe('match', function() {
       });
   });
 
-  xit('listening on error captures errors emitted in the first stream', function(done) {
+  function errorStream() {
+    return pi.thru.obj(function(chunk, enc, done) {
+      this.emit('error', new Error('Expected error'));
+      this.push(chunk);
+      done();
+    });
+  }
+  function always() { return true; }
+  function never() { return false; }
 
+  it('listening on error captures errors emitted in the first stream', function(done) {
+    var stream = pi.match(always, errorStream(), never, pi.thru.obj(), pi.thru.obj());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
+
+    pi.fromArray(1).pipe(stream);
   });
 
+  it('listening on error captures errors emitted in the second stream', function(done) {
+    var stream = pi.match(never, pi.thru.obj(), always, errorStream(), pi.thru.obj());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
 
-  xit('listening on error captures errors emitted in the second stream', function(done) {
-
+    pi.fromArray(1).pipe(stream);
   });
 
+  it('listening on error captures errors emitted in the rest stream', function(done) {
+    var stream = pi.match(never, pi.thru.obj(), never, pi.thru.obj(), errorStream());
+    stream.once('error', function(err) {
+      assert.ok(err);
+      done();
+    });
 
-  xit('listening on error captures errors emitted in the rest stream', function(done) {
-
+    pi.fromArray(1).pipe(stream);
   });
 
 });
