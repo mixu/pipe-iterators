@@ -41,6 +41,8 @@ Returns a duplex stream which produces a new stream of values by mapping each va
 
 If `thisArg` is provided, it is available as `this` within the callback.
 
+Note: if you return `null` from your map function, core streams will interpret this as EOF for the stream.
+
 ```js
 pi.fromArray([{ a: 'a' }, { b: 'b' }, { c: 'c' }])
   .pipe(pi.map(function(obj) { return _.defaults(obj, { foo: 'bar' }); }));
@@ -130,17 +132,67 @@ You can also pass an instance of an array instead of a callback. The array's con
 
 ## Constructing streams
 
+These functions make creating readable, writable and transform streams a bit less boilerplatey.
+
 ### thru & through
 
-Both of these functions return the `through2` module's function, which can be used to construct Transform streams.
+```js
+pi.thru([options], [transformFn], [flushFn]);
+pi.thru.obj([transformFn], [flushFn]);
+pi.thru.ctor([options], [transformFn], [flushFn]);
+```
 
-- `.through`: exposes the [through2](https://github.com/rvagg/through2) instance used, may be useful if you are using through2 anyway.
+Returns a Transform stream given a set of `options`, a `transformFn` and `flushFn`. You can call this function as `pi.through` or `pi.thru`. This uses the `through2` module, so you should [take a look at the documentation for that module](https://github.com/rvagg/through2). In short:
+
+- The `options` hash is passed to `stream.Transform` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_duplex_options).
+- The `transformFn` has the signature: `function (chunk, encoding, onDone) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_transform_chunk_encoding_callback) for details.
+- The `flushFn` has the signature `function(onDone)`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_flush_callback) for details.
+- `thru.obj(fn)` is a convenience wrapper around `thru({ objectMode: true }, fn)`. 
+- `thru.ctor()` returns a constructor for a custom Transform. This is useful when you want to use the same transform logic in multiple instances.
 
 ### writable
 
+```js
+pi.writable([options], [writeFn]);
+pi.writable.obj([writeFn]);
+pi.writable.ctor([options], [writeFn]);
+```
+
+Returns a Writable stream given a set of `options` and a `writeFn`.
+
+Has the same options as `thru`:
+
+- The `options` hash is passed to `stream.Writable` to construct the stream.
+- The `writeFn` has the signature: ``
+- `writable.obj` is a convenience wrapper for `writable({ objectMode: true })`.
+- `writable.ctor()` returns a constructor for the writable stream.
+
 ### readable
 
+```js
+pi.readable([options], [readFn]);
+pi.readable.obj([readFn]);
+pi.readable.ctor([options], [readFn]);
+```
+
+Returns a Writable stream given a set of `options` and a `writeFn`.
+
+Has the same options as `thru`:
+
+- The `options` hash is passed to `stream.Writable` to construct the stream.
+- The `writeFn` has the signature: ``
+- `writable.obj` is a convenience wrapper for `writable({ objectMode: true })`.
+- `writable.ctor()` returns a constructor for the writable stream.
+
 ### duplex
+
+```js
+pi.duplex(writableStream, readableStream);
+```
+
+Takes a readable stream and a writable stream and returns a duplex stream. 
+
+Note: the two streams ARE NOT piped together. If you want to construct a pipeline with multiple streams, you can, but you need to perform the pipe operations yourself (or use the `.pipeline` function instead). This makes `.duplex` work with streams where the connections is not via a pipe mechanism, like with `child_process.spawn`:
 
 ```js
 var child = require('child_process').spawn('wc', ['-c']);
@@ -149,9 +201,7 @@ pi.fromArray(['a', 'b', 'c'])
   .pipe(process.stdout);
 ```
 
-Takes a readable stream and a writable stream and returns a duplex stream. Note that the two streams are not piped together or otherwise altered. Actually returns a wrapper which redirects method calls to the readable / writable stream as appropriate.
-
-TODO: Listening for 'error' will recieve errors from all streams inside the pipe.
+Listeners for the `error` event will receive errors that are emitted in either stream, or that are emitted as a result of piping into the duplex stream.
 
 ### devnull
 
@@ -180,7 +230,7 @@ pi.fork(stream1, [stream2], [...])
 pi.fork([ stream1, stream2, ... ])
 ```
 
-Returns a writable stream. Inputs written to the stream are written to all of the streams passed as arguments to `fork`.
+Returns a duplex stream. Inputs written to the stream are written to all of the streams passed as arguments to `fork`.
 
 Every forked stream receives a clone of the original input object. Cloning prevents annoying issues that might occur when one fork stream modifies an object that is shared among multiple forked streams.
 
@@ -199,8 +249,7 @@ Returns a writable stream given a series of `condition` function and `stream` pa
 
 The `condition` function is called with two arguments - `obj` (the element value) and `index` (the element index). If the condition returns `true`, the element is written to the associated stream and no further matches are performed.
 
-The last argument to `match` is optional. It can be a stream without a preceding condition function, and any elements not matching the other conditions will be written into it.
-
+The last argument, `rest` is optional. It should be a writable stream (without a preceding condition function). Any elements not matching the other conditions will be written into it.
 
 ```js
 pi.fromArray([
