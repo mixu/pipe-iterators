@@ -1,6 +1,6 @@
 {
   "name": "pipe-iterators",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Map, reduce, filter, fork, pipeline and other utility functions for iterating over object mode streams.",
   "main": "index.js",
   "scripts": {
