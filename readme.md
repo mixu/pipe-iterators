@@ -262,6 +262,8 @@ Every forked stream receives a clone of the original input object. Cloning preve
 
 Also accepts a single array of streams as the first parameter. 
 
+Listeners for the `error` event on the stream returned from `fork` will receive errors that are emitted in any of the streams in passed to the function.
+
 ### match
 
 ```js
@@ -276,6 +278,8 @@ Returns a writable stream given a series of `condition` function and `stream` pa
 The `condition` function is called with two arguments - `obj` (the element value) and `index` (the element index). If the condition returns `true`, the element is written to the associated stream and no further matches are performed.
 
 The last argument, `rest` is optional. It should be a writable stream (without a preceding condition function). Any elements not matching the other conditions will be written into it.
+
+Listeners for the `error` event on the stream returned from `match` will receive errors that are emitted in any of the streams in passed to the function.
 
 ```js
 pi.fromArray([
@@ -299,9 +303,6 @@ pi.fromArray([
     )
   ));
 ```
-
-TODO: Listening for 'error' will recieve errors from all streams inside the pipe.
-
 
 ## Constructing pipelines from individual elements
 
@@ -372,6 +373,8 @@ module.exports = function() {
 
 works as expected and `input.pipe(myPipeline).pipe(b)` writes to `a` but reads from `a3`.
 
+Listeners for the `error` event on the stream returned from `pipeline` will receive errors that are emitted in any of the streams in passed to the function.
+
 ### Checking stream instances
 
 These functions are like [rvagg/isstream](https://github.com/rvagg/isstream), but they work correctly on Node 0.8. The main differences are that 1) the 0.8 core streams from things like fs and child_process are correctly detected and 2) the functions use duck typing (checking for conformance to an API) rather than `instanceof` checks which can be problematic in a browser environment or when using modules that are compatible from an API perspective but do not descend from the native `stream`.
@@ -403,7 +406,7 @@ Returns true if a stream provides the Writable stream interface.
 #### isDuplex
 
 ```js
-pi.isDuplext(obj)
+pi.isDuplex(obj)
 ```
 
 Returns true if a stream provides both the Readable and Writable stream interfaces.
