@@ -154,3 +154,165 @@ describe('fork', function() {
       });
   });
 });
+
+describe('merge', function() {
+
+  it('returns a duplex stream', function() {
+    assert.ok(isDuplex(pi.merge()));
+  });
+
+  it('merges multiple streams', function(done) {
+    pi.merge(pi.fromArray(1, 2), pi.fromArray(3, 4), pi.fromArray(5, 6))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [ 1, 2, 3, 4, 5, 6 ]);
+        done();
+      }));
+  });
+
+  it('merges multiple streams, arg is array', function(done) {
+    pi.merge([pi.fromArray(1, 2), pi.fromArray(3, 4), pi.fromArray(5, 6)])
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [ 1, 2, 3, 4, 5, 6 ]);
+        done();
+      }));
+  });
+
+
+  it('works with just one stream', function(done) {
+    pi.merge(pi.fromArray(1))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [ 1 ]);
+        done();
+      }));
+  });
+
+  it('works with one empty stream', function(done) {
+    pi.merge(pi.fromArray(1), pi.fromArray(), pi.fromArray(2))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [ 1, 2 ]);
+        done();
+      }));
+  });
+
+  it('works with just empty streams', function(done) {
+    pi.merge(pi.fromArray(), pi.fromArray())
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), []);
+        done();
+      }));
+  });
+
+  it('works in flowing mode', function(done) {
+    var result = [];
+    pi.merge(pi.fromArray(1, 2), pi.fromArray(3, 4), pi.fromArray(5, 6))
+      .on('data', function(data) { result.push(data); })
+      .once('end', function() {
+        assert.deepEqual(result.sort(), [ 1, 2, 3, 4, 5, 6]);
+        done();
+      });
+  });
+
+});
+
+function logEvts(id, stream) {
+  // readable (non-flowing) stream
+  return stream.on('readable', function() {
+    console.log('[' + id +'] "readable"');
+  })
+  .on('end', function() {
+    console.log('[' + id +'] "end"');
+  })
+  .on('close', function() {
+    console.log('[' + id +'] "close"');
+  })
+  .on('error', function(err) {
+    console.log('[' + id +'] "error"', err);
+  })
+  // writable (non-flowing) stream
+  .on('drain', function() {
+    console.log('[' + id +'] "drain"');
+  })
+  .on('finish', function() {
+    console.log('[' + id +'] "finish"');
+  })
+  .on('pipe', function() {
+    console.log('[' + id +'] "pipe"');
+  })
+  .on('unpipe', function() {
+    console.log('[' + id +'] "unpipe"');
+  });
+}
+
+function logStream(id) {
+  return logEvts(id, pi.thru.obj(function(data, enc, done) {
+    console.log('[' + id + '] _transform ' + data);
+    this.push(data);
+    done();
+  }, function(done) {
+    console.log('[' + id +'] _flush');
+    done();
+  }));
+}
+
+
+describe('forkMerge', function() {
+
+  function doubler(val) { return val * 2; }
+  function add100(val) { return val + 100; }
+
+  it('combines a fork stream and a merge stream', function(done) {
+
+    pi.fromArray(1, 2, 3)
+    .pipe(
+       pi.forkMerge(
+        pi.pipeline(pi.map(doubler), pi.map(doubler)),
+        pi.pipeline(pi.map(add100), pi.map(add100))
+      )
+    ).pipe(pi.toArray(function(result) {
+      assert.deepEqual(
+        result.sort(function(a, b){ return a-b; }),
+        [ 4, 8, 12, 201, 202, 203 ]
+      );
+      done();
+    }))
+
+  });
+
+});
+
+describe('matchMerge', function() {
+
+  function add10(val) { return val + 10; }
+  function add100(val) { return val + 100; }
+
+  it('combines a match stream and a merge stream', function(done) {
+
+    pi.fromArray([ 1, 2, 3, 4, 5, 6 ])
+      .pipe(pi.matchMerge(
+          function(obj) { return obj % 2 == 0; },
+          pi.map(add10),
+          function(obj) { return obj % 3 == 0; },
+          pi.map(add100),
+          pi.thru.obj()
+        ))
+      .pipe(pi.toArray(function(result) {
+
+
+        assert.deepEqual(
+          result.sort(function(a, b){ return a-b; }),
+          [
+            1, // 1 -> 1
+            5, // 5 -> 5
+
+            12, // 2 -> + 10 -> 12
+            14, // 4 -> + 10 -> 14
+            16, // 6 -> + 10 -> 16
+
+            103 // 3 -> + 100 -> 103
+          ]
+        );
+        done();
+      }));
+  });
+
+});

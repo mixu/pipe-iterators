@@ -12,6 +12,13 @@ Preamble:
 var pi = require('pipe-iterators');
 ```
 
+## Changelog
+
+`v1.1.0`:
+
+- added the `merge`, `forkMerge` and `matchMerge` functions. 
+- fixed a bug in `pipeline`.
+
 ## Iteration functions
 
 The iterator functions closely follow the native `Array.*` iteration API (e.g. `forEach`, `map`, `filter`), but the functions return object mode streams instead of operating on arrays.
@@ -86,7 +93,7 @@ pi.mapKey(key, callback, [thisArg])
 pi.mapKey(hash, [thisArg])
 ```
 
-Returns a duplex stream which produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with two arguments: `value` (the value `element[key]`), and `obj` (the element itself). The return value from the callback is set on the element, and the element itself is written back to the stream. 
+Returns a duplex stream which produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with three arguments: `value` (the value `element[key]`), `obj` (the element itself) and `index` (the element index). The return value from the callback is set on the element, and the element itself is written back to the stream. 
 
 If `thisArg` is provided, it is available as `this` within the callback.
 
@@ -304,6 +311,53 @@ pi.fromArray([
   ));
 ```
 
+## merge
+
+```js
+pi.merge(stream1, [stream2], [...])
+pi.merge([ stream1, stream2, ... ])
+```
+
+Takes multiple readable streams and merges them into one stream. Accepts any number of readable streams and returns a duplex stream.
+
+# forkMerge
+
+```js
+pi.forkMerge(stream1, [stream2], [...])
+pi.forkMerge([ stream1, stream2, ... ])
+```
+
+Fork followed by merge on a set of streams. Accepts any number of duplex streams; returns a duplex stream that:
+
+- `fork`s each input, writes each input into the streams,
+- reads and `merge`s the inputs from the streams and writes them out
+
+Useful if you need to concurrently apply different operations on a single input but want to produce a single merged output. 
+
+```
+           / to-html() \
+read .md() - to-pdf()  - write-to-disk()
+           \ to-rtf()  / 
+```
+
+For example, imagine converting a set of Markdown files into the HTML, PDF and RTF formats - the same file goes in, each of the processing operations are applied, but at the end there are three objects (binary files in the different formats) that go into the same "write to disk" pipeline.
+
+# matchMerge 
+
+```js
+pi.matchMerge(condition1, stream1, [condition2], [stream2], [...], [rest])
+pi.matchMerge([ condition1, stream1, condition2, stream2, ..., rest ])
+```
+
+Match followed by merge on a set of streams. Accepts any number of duplex streams; returns a duplex stream that:
+
+- `match`es conditions, selects the correct stream and writes to that stream
+- reads and `merge`s the inputs from each of the streams and writes them out
+
+Useful if you want to conditionally process some elements differently, while sharing the same downstream pipeline.
+
+For example, if you want to first check a cache and skip some processing for items that hit in the cache, you could do something like `pi.matchMerge(checkCache, getResultFromCache, performFullProcessing)` (where `checkCache` is a function and the other two are through streams).
+
 ## Constructing pipelines from individual elements
 
 These functions apply `pipe` in various ways to make it easier to go from an array of streams to a pipeline.
@@ -430,3 +484,4 @@ Best handled by something that can do that in an efficient manner, such as [bina
   - [KylePDavis/node-stream-utils](https://github.com/KylePDavis/node-stream-utils): duplex() for old (0.8.x) style streams
   - [sterpe/composite-pipes](https://github.com/sterpe/composite-pipes)
 - [rvagg/isstream](https://github.com/rvagg/isstream)
+- [grncdr/merge-stream](https://github.com/grncdr/merge-stream)

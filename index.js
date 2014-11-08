@@ -1,6 +1,7 @@
 var through = require('through2'),
     cloneLib = require('clone'),
-    Readable = require('readable-stream').Readable;
+    Readable = require('readable-stream').Readable,
+    xtend = require('xtend');
 
 var isStream = require('./lib/is-stream.js'),
     Match = require('./lib/match.js');
@@ -30,6 +31,7 @@ exports.reduce = function(fn, initial) {
   var index = 0,
       captureFirst = (arguments.length < 2),
       acc = (!captureFirst ? initial : null);
+
   return through.obj(function(obj, enc, onDone) {
     if (captureFirst) {
       acc = obj;
@@ -129,7 +131,7 @@ exports.writable = require('./lib/writable.js');
 exports.readable = require('./lib/readable.js');
 exports.duplex = require('./lib/duplex.js');
 
-// based on https://github.com/deoxxa/duplexer2/pull/6
+// based on https://github.com/deoxxa/duplexer2/pull/6 (with an additional bugfix)
 exports.combine = function(writable, readable) {
   if (!isStream.isWritable(writable)) {
     throw new Error('The first stream must be writable.');
@@ -147,8 +149,7 @@ exports.combine = function(writable, readable) {
     readable = new Readable().wrap(readable);
   }
 
-  var shouldRead = false,
-      stream = exports.duplex.obj(function(chunk, enc, done) {
+  var stream = exports.duplex.obj(function(chunk, enc, done) {
         // Node 0.8.x writable streams do not accept the third parameter, done
         var ok = writable.write(chunk, enc);
         if (ok) {
@@ -156,30 +157,26 @@ exports.combine = function(writable, readable) {
         } else {
           writable.once('drain', done);
         }
-      }, function() {
-        if (shouldRead) { return; }
-        shouldRead = true;
-        forwardRead();
-      });
+      }, forwardRead);
 
   writable.once('finish', function() { stream.end(); });
   stream.once('finish', function() { writable.end(); });
-  writable.on('error', function(err) { return stream.emit('error', err); });
 
-  readable.on('readable', forwardRead);
-  readable.once('end', function() { return stream.push(null); });
-  readable.on('error', function(err) { return stream.emit('error', err); });
+  readable.once('end', function() { stream.push(null); });
+
+  writable.on('error', function(err) { stream.emit('error', err); });
+  readable.on('error', function(err) { stream.emit('error', err); });
 
   function forwardRead() {
-    if (!shouldRead) { return; }
     var data, waitingToRead = true;
     while ((data = readable.read()) !== null) {
       waitingToRead = false;
       stream.push(data);
     }
-    shouldRead = waitingToRead;
+    if (waitingToRead) {
+      readable.once('readable', forwardRead);
+    }
   }
-
   return stream;
 };
 
@@ -228,9 +225,8 @@ exports.fork = function() {
 
 function trueFn() { return true; }
 
-exports.match = function() {
-  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments)),
-      conditions = [],
+function parseMatch(args) {
+  var conditions = [],
       streams = [],
       i = 0;
 
@@ -246,12 +242,25 @@ exports.match = function() {
     conditions.push(trueFn);
     streams.push(args[i]);
   }
+  return { conditions: conditions, streams: streams };
+}
 
-  return new Match({
-    objectMode: true,
-    conditions: conditions,
-    streams: streams
-  });
+exports.match = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  return new Match(xtend({ objectMode: true }, parseMatch(args)));
+};
+
+exports.merge = require('merge-stream');
+
+exports.forkMerge = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
+  return exports.combine(exports.fork(args), exports.merge(args));
+};
+
+exports.matchMerge = function() {
+  var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments)),
+      parsed = xtend({ objectMode: true }, parseMatch(args));
+  return exports.combine(new Match(parsed), exports.merge(parsed.streams));
 };
 
 // Constructing pipelines from individual elements

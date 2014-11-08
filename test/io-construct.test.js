@@ -127,4 +127,16 @@ describe('combine', function() {
 
     pi.fromArray(1).pipe(result).pipe(pi.devnull());
   });
+
+  // readable
+  xit('emits the readable event when readable');
+  xit('emits the data event when in push stream mode');
+  xit('emits the end event when in push stream mode');
+  xit('emits the close event when the input stream emits close');
+
+  // writable
+  xit('emits the finish event');
+  xit('emits the drain event when drained');
+  xit('emits the pipe event when piped to');
+  xit('emits the unpipe event when unpiped from');
 });
