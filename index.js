@@ -263,6 +263,23 @@ exports.matchMerge = function() {
   return exports.combine(new Match(parsed), exports.merge(parsed.streams));
 };
 
+var miniq = require('miniq');
+
+exports.queue = function(limit, execFn) {
+  var queue = miniq(limit),
+      stream = exports.thru.obj(function(task, enc, done) {
+        if (!execFn) {
+          queue.exec(task.bind(stream), done);
+        } else {
+          queue.exec(function(taskDone) {
+            execFn.call(stream, task.bind(stream), taskDone);
+          }, done);
+        }
+      });
+
+  return stream;
+};
+
 // Constructing pipelines from individual elements
 
 exports.pipe = function() {

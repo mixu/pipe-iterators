@@ -311,7 +311,7 @@ pi.fromArray([
   ));
 ```
 
-## merge
+### merge
 
 ```js
 pi.merge(stream1, [stream2], [...])
@@ -320,7 +320,7 @@ pi.merge([ stream1, stream2, ... ])
 
 Takes multiple readable streams and merges them into one stream. Accepts any number of readable streams and returns a duplex stream.
 
-# forkMerge
+### forkMerge
 
 ```js
 pi.forkMerge(stream1, [stream2], [...])
@@ -342,7 +342,7 @@ read .md() - to-pdf()  - write-to-disk()
 
 For example, imagine converting a set of Markdown files into the HTML, PDF and RTF formats - the same file goes in, each of the processing operations are applied, but at the end there are three objects (binary files in the different formats) that go into the same "write to disk" pipeline.
 
-# matchMerge 
+### matchMerge 
 
 ```js
 pi.matchMerge(condition1, stream1, [condition2], [stream2], [...], [rest])
@@ -357,6 +357,18 @@ Match followed by merge on a set of streams. Accepts any number of duplex stream
 Useful if you want to conditionally process some elements differently, while sharing the same downstream pipeline.
 
 For example, if you want to first check a cache and skip some processing for items that hit in the cache, you could do something like `pi.matchMerge(checkCache, getResultFromCache, performFullProcessing)` (where `checkCache` is a function and the other two are through streams).
+
+### queue
+
+```js
+pi.queue(limit, [execFn])
+```
+
+- execFn: `function(task, done)`
+
+Events:
+
+- empty (when queue is empty)
 
 ## Constructing pipelines from individual elements
 

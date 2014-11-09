@@ -316,3 +316,22 @@ describe('matchMerge', function() {
   });
 
 });
+
+describe('queue', function() {
+
+  it('can execute a series of tasks', function(done) {
+    pi.fromArray(1, 2, 3)
+      .pipe(pi.map(function(val) {
+        return function (done) {
+          this.push(val * 2);
+          done();
+        };
+      }))
+      .pipe(pi.queue(1))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result, [ 2, 4, 6 ]);
+        done();
+      }));
+  });
+
+});

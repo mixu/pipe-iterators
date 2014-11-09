@@ -25,6 +25,7 @@
   "dependencies": {
     "clone": "0.1.18",
     "merge-stream": "0.1.6",
+    "miniq": "0.1.2",
     "readable-stream": "*",
     "through2": "*",
     "xtend": "4.0.0"
