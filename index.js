@@ -265,17 +265,36 @@ exports.matchMerge = function() {
 
 var miniq = require('miniq');
 
-exports.queue = function(limit, execFn) {
+exports.queue = function(limit, execFn, endFn) {
+  if (!execFn) {
+    execFn = function(task, enc, done) { task.call(this, done); };
+  }
   var queue = miniq(limit),
-      stream = exports.thru.obj(function(task, enc, done) {
-        if (!execFn) {
-          queue.exec(task.bind(stream), done);
+      cleanup = function(done) {
+        queue.removeAllListeners();
+        if (endFn) { endFn(done); } else { done(); }
+      },
+      stream = exports.thru.obj(function(chunk, enc, chunkDone) {
+        queue.exec(function(taskDone) {
+          execFn.call(stream, chunk, enc, taskDone);
+        });
+        if (!queue.isFull()) {
+          chunkDone(); // ask for more tasks, queue still has space
         } else {
-          queue.exec(function(taskDone) {
-            execFn.call(stream, task.bind(stream), taskDone);
-          }, done);
+          queue.once('done', function() { chunkDone(); }); // wait until a task completes
+        }
+      }, function(done) {
+        // once "_flush" occurs, wait for the queue to also become empty
+        if (queue.isEmpty()) {
+          cleanup(done);
+        } else {
+          queue.once('empty', cleanup.bind(this, done));
         }
       });
+
+  queue.on('done', stream.emit.bind(stream, 'done'));
+  queue.on('error', stream.emit.bind(stream, 'error'));
+  queue.on('empty', stream.emit.bind(stream, 'empty'));
 
   return stream;
 };
@@ -285,16 +304,16 @@ exports.queue = function(limit, execFn) {
 exports.pipe = function() {
   var args = (Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments));
   if (!isStream.isReadable(args[0])) {
-    throw new Error('First stream must be readable.');
+    throw new Error('pipe(): First stream must be readable.');
   }
 
   if (!isStream.isWritable(args[0])) {
-    throw new Error('Last stream must be writable.');
+    throw new Error('pipe(): Last stream must be writable.');
   }
 
   args.slice(1, -1).map(function(stream) {
     if (!isStream.isDuplex(stream)) {
-      throw new Error('Streams in the pipeline must be duplex.');
+      throw new Error('pipe(): Streams in the pipeline must be duplex.');
     }
   });
 
@@ -313,7 +332,7 @@ exports.tail = function() {
 };
 
 exports.pipeline = function() {
-  var streams = exports.pipe(Array.prototype.slice.call(arguments)),
+  var streams = exports.pipe((Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments))),
       last = streams[streams.length - 1],
       isDuplex = isStream.isDuplex(last),
       head = isDuplex ? exports.combine(streams[0], last) : exports.cap(streams[0]);

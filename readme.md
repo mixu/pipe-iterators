@@ -358,17 +358,24 @@ Useful if you want to conditionally process some elements differently, while sha
 
 For example, if you want to first check a cache and skip some processing for items that hit in the cache, you could do something like `pi.matchMerge(checkCache, getResultFromCache, performFullProcessing)` (where `checkCache` is a function and the other two are through streams).
 
-### queue
+### parallel
 
 ```js
-pi.queue(limit, [execFn])
+pi.parallel(limit, [transformFn], [flushFn])
 ```
 
-- execFn: `function(task, done)`
+Returns a object-mode Transform stream given a `transformFn` and `flushFn`. Works like a `through.obj` stream but:
 
-Events:
+- the `transformFn` can be launched multiple times in parallel, with up to `limit` tasks running at the same time
+- the `flushFn` is only called after both 1) the thru-stream is instructed to end AND 2) all the tasks have been completed.
+- the stream emits the following events:
+  - `"done"`: emitted after each `transformFn` execution completes
+  - `"empty"`: emitted when the execution queue becomes empty
 
-- empty (when queue is empty)
+The usual thru-stream conventions apply:
+
+- The `transformFn` has the signature: `function (chunk, encoding, onDone) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_transform_chunk_encoding_callback) for details.
+- The `flushFn` has the signature `function(onDone)`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_flush_callback) for details.
 
 ## Constructing pipelines from individual elements
 

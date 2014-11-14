@@ -319,9 +319,11 @@ describe('matchMerge', function() {
 
 describe('queue', function() {
 
-  it('can execute a series of tasks', function(done) {
+  it('can execute a series of tasks in serial order', function(done) {
+    var calls = [];
     pi.fromArray(1, 2, 3)
-      .pipe(pi.map(function(val) {
+      .pipe(pi.map(function(val, i) {
+        calls.push(i);
         return function (done) {
           this.push(val * 2);
           done();
@@ -329,9 +331,129 @@ describe('queue', function() {
       }))
       .pipe(pi.queue(1))
       .pipe(pi.toArray(function(result) {
+        assert.deepEqual(calls, [ 0, 1, 2]);
         assert.deepEqual(result, [ 2, 4, 6 ]);
         done();
       }));
+  });
+
+  it('can execute a series of tasks with parallelism 2', function(done) {
+    pi.fromArray([
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(1);
+          done();
+        }, 50);
+      },
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(2);
+          done();
+        }, 100);
+      },
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(3);
+          done();
+        }, 25);
+      }
+    ])
+      .pipe(pi.queue(2))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result, [ 1, 3, 2 ]); // due to timeouts
+        done();
+      }));
+  });
+
+  it('can execute a series of tasks with infinite parallelism', function(done) {
+    pi.fromArray([
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(1);
+          done();
+        }, 50);
+      },
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(2);
+          done();
+        }, 100);
+      },
+      function(done) {
+        var self = this;
+        setTimeout(function() {
+          self.push(3);
+          done();
+        }, 25);
+      }
+    ])
+      .pipe(pi.queue(Infinity))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result, [ 3, 1, 2 ]); // due to timeouts
+        done();
+      }));
+  });
+
+  it('works with empty', function(done) {
+    pi.fromArray([])
+      .pipe(pi.queue(Infinity))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result, [ ]);
+        done();
+      }));
+  });
+
+  it('add to queue while executing', function(done) {
+    var callOrder = [];
+
+    // there are no guarantees that one "done" action runs
+    // before another (unless you do parallelism = 1)
+    function checkDone() {
+      if (callOrder.length < 4) {
+        return;
+      }
+      var expected = [ '1-1', '1-2', '2-2', '2-1' ];
+      assert.ok(
+        expected.every(function(item) { return callOrder.indexOf(item) > -1; }),
+        'every callback should have run');
+
+      done();
+    }
+
+    pi.fromArray([
+      function a(done) {
+        callOrder.push('1-1');
+        done();
+        // add more tasks
+        this.write(function c(done) {
+            setTimeout(function() {
+              callOrder.push('2-1');
+              done();
+              checkDone();
+            }, 20);
+          });
+        this.write(function d(done) {
+            callOrder.push('2-2');
+            done();
+            checkDone();
+          });
+      },
+      function b(done) {
+        setTimeout(function() {
+          callOrder.push('1-2');
+          done();
+          checkDone();
+        }, 100);
+      }
+      ])
+      .pipe(pi.queue(1))
+      .pipe(pi.devnull());
+
   });
 
 });
