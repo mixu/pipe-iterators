@@ -5,7 +5,7 @@ Like underscore for Node streams (streams2 and up).
 Functions for iterating over object mode streams:
 
 - [Iteration functions](#iteration-functions): [`forEach`](#foreach), [`map`](#map), [`reduce`](#reduce), [`filter`](#filter), [`mapKey`](#mapkey)
-- [Input and output](#input-and-output): [`fromArray`](#fromarray), [`toArray`](#toarray),
+- [Input and output](#input-and-output): [`fromArray`](#fromarray), [`toArray`](#toarray)
 - [Constructing streams](#constructing-streams): [`through` / `thru`](#thru--through), [`writable`](#writable), [`readable`](#readable), [`duplex`](#duplex), [`combine`](#combine), [`devnull`](#devnull), [`cap`](#cap), [`clone`](#clone)
 - [Control flow](#control-flow): [`fork`](#fork), [`match`](#match), [`merge`](#merge), [`forkMerge`](#forkmerge), [`matchMerge`](#matchmerge), [`parallel`](#parallel)
 - [Constructing pipelines from individual elements](#constructing-pipelines-from-individual-elements): [`pipe`](#pipe), [`head`](#head), [`tail`](#tail), [`pipeline`](#pipeline)
@@ -165,6 +165,8 @@ Returns a Transform stream given a set of `options`, a `transformFn` and `flushF
 - The `flushFn` has the signature `function(onDone)`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_flush_callback) for details.
 - `thru.obj(fn)` is a convenience wrapper around `thru({ objectMode: true }, fn)`.
 - `thru.ctor()` returns a constructor for a custom Transform. This is useful when you want to use the same transform logic in multiple instances.
+
+BTW, if you need parallel execution but with the same API as a `thru` stream, check out [`parallel`](#parallel) in the control flow section.
 
 ### writable
 
@@ -373,7 +375,7 @@ For example, if you want to first check a cache and skip some processing for ite
 pi.parallel(limit, [transformFn], [flushFn])
 ```
 
-Returns a object-mode Transform stream given a `transformFn` and `flushFn`. Works like a `through.obj` stream but:
+Returns a object-mode Transform stream given a `limit`, a `transformFn` and `flushFn`. Works like a `through.obj` stream but:
 
 - the `transformFn` can be launched multiple times in parallel, with up to `limit` tasks running at the same time
 - the `flushFn` is only called after both 1) the thru-stream is instructed to end AND 2) all the tasks have been completed.
@@ -385,6 +387,27 @@ The usual thru-stream conventions apply:
 
 - The `transformFn` has the signature: `function (chunk, encoding, onDone) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_transform_chunk_encoding_callback) for details.
 - The `flushFn` has the signature `function(onDone)`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_flush_callback) for details.
+
+Both `transformFn` and `flushFn` are optional. If the transformFn is not provided, then it defaults to:
+
+```js
+function(task, enc, done) { task.call(this, done); }
+```
+
+which works nicely if the items in your stream are something like:
+
+    pi.fromArray([
+        function(done) { this.push(1); done(); },
+        function(done) { this.push(2); done(); }
+      ])
+      .pipe(pi.parallel(2))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [1, 2]);
+      }));
+
+Note how each task runs with `this` set to the `parallel` stream, which means you can push results out. Similar to normal core streams, the `done` function can return one argument - `err`. If you need to process the other arguments, define your own `transformFn`.
+
+Note that you can safely call `this.write()` from within the transform function to add more tasks to run - this can be useful if your task processing causes more tasks to need to run. If you need the new payloads to go through some upstream processing, you can might consider writing to another stream that precedes `parallel`, provided you haven't ended that stream yet.
 
 ## Constructing pipelines from individual elements
 
