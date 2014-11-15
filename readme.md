@@ -396,14 +396,16 @@ function(task, enc, done) { task.call(this, done); }
 
 which works nicely if the items in your stream are something like:
 
-    pi.fromArray([
-        function(done) { this.push(1); done(); },
-        function(done) { this.push(2); done(); }
-      ])
-      .pipe(pi.parallel(2))
-      .pipe(pi.toArray(function(result) {
-        assert.deepEqual(result.sort(), [1, 2]);
-      }));
+```js
+pi.fromArray([
+    function(done) { this.push(1); done(); },
+    function(done) { this.push(2); done(); }
+  ])
+  .pipe(pi.parallel(2))
+  .pipe(pi.toArray(function(result) {
+    assert.deepEqual(result.sort(), [1, 2]);
+  }));
+```
 
 Note how each task runs with `this` set to the `parallel` stream, which means you can push results out. Similar to normal core streams, the `done` function can return one argument - `err`. If you need to process the other arguments, define your own `transformFn`.
 
