@@ -1,7 +1,7 @@
 {
   "name": "pipe-iterators",
   "version": "1.0.0",
-  "description": "Map, reduce, filter, fork, pipeline and other utility functions for iterating over object mode streams.",
+  "description": "Like underscore for Node streams. Map, reduce, filter, fork, pipeline and other utility functions for iterating over object mode streams.",
   "main": "index.js",
   "scripts": {
     "test": "mocha -R spec ./test/iterators.test.js ./test/io-construct.test.js ./test/control-flow.test.js ./test/pipe.test.js"
@@ -25,7 +25,7 @@
   "dependencies": {
     "clone": "0.1.18",
     "merge-stream": "0.1.6",
-    "miniq": "0.1.2",
+    "miniq": "~1.0.0",
     "readable-stream": "*",
     "through2": "*",
     "xtend": "4.0.0"

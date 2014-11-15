@@ -265,7 +265,7 @@ exports.matchMerge = function() {
 
 var miniq = require('miniq');
 
-exports.queue = function(limit, execFn, endFn) {
+exports.parallel = function(limit, execFn, endFn) {
   if (!execFn) {
     execFn = function(task, enc, done) { task.call(this, done); };
   }

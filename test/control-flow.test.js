@@ -317,7 +317,7 @@ describe('matchMerge', function() {
 
 });
 
-describe('queue', function() {
+describe('parallel', function() {
 
   it('can execute a series of tasks in serial order', function(done) {
     var calls = [];
@@ -329,10 +329,22 @@ describe('queue', function() {
           done();
         };
       }))
-      .pipe(pi.queue(1))
+      .pipe(pi.parallel(1))
       .pipe(pi.toArray(function(result) {
         assert.deepEqual(calls, [ 0, 1, 2]);
         assert.deepEqual(result, [ 2, 4, 6 ]);
+        done();
+      }));
+  });
+
+  it('can run the example', function(done) {
+    pi.fromArray([
+        function(done) { this.push(1); done(); },
+        function(done) { this.push(2); done(); }
+      ])
+      .pipe(pi.parallel(2))
+      .pipe(pi.toArray(function(result) {
+        assert.deepEqual(result.sort(), [1, 2]);
         done();
       }));
   });
@@ -361,7 +373,7 @@ describe('queue', function() {
         }, 25);
       }
     ])
-      .pipe(pi.queue(2))
+      .pipe(pi.parallel(2))
       .pipe(pi.toArray(function(result) {
         assert.deepEqual(result, [ 1, 3, 2 ]); // due to timeouts
         done();
@@ -392,7 +404,7 @@ describe('queue', function() {
         }, 25);
       }
     ])
-      .pipe(pi.queue(Infinity))
+      .pipe(pi.parallel(Infinity))
       .pipe(pi.toArray(function(result) {
         assert.deepEqual(result, [ 3, 1, 2 ]); // due to timeouts
         done();
@@ -401,14 +413,14 @@ describe('queue', function() {
 
   it('works with empty', function(done) {
     pi.fromArray([])
-      .pipe(pi.queue(Infinity))
+      .pipe(pi.parallel(Infinity))
       .pipe(pi.toArray(function(result) {
         assert.deepEqual(result, [ ]);
         done();
       }));
   });
 
-  it('add to queue while executing', function(done) {
+  it('add to parallel while executing', function(done) {
     var callOrder = [];
 
     // there are no guarantees that one "done" action runs
@@ -451,7 +463,7 @@ describe('queue', function() {
         }, 100);
       }
       ])
-      .pipe(pi.queue(1))
+      .pipe(pi.parallel(1))
       .pipe(pi.devnull());
 
   });

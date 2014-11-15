@@ -409,6 +409,19 @@ pi.fromArray([
 
 Note how each task runs with `this` set to the `parallel` stream, which means you can push results out. Similar to normal core streams, the `done` function can return one argument - `err`. If you need to process the other arguments, define your own `transformFn`.
 
+Of course, you don't have to use callback functions just to get parallel processing - any task, even a basic thru stream like:
+
+```js
+pi.parallel(16, function(filename, enc, done) {
+  var self = this;
+  fs.stat(filename, function(err, result) {
+    self.push(result); done();
+  })
+});
+```
+
+will execute up to 16 stat calls at a time with `parallel`.
+
 Note that you can safely call `this.write()` from within the transform function to add more tasks to run - this can be useful if your task processing causes more tasks to need to run. If you need the new payloads to go through some upstream processing, you can might consider writing to another stream that precedes `parallel`, provided you haven't ended that stream yet.
 
 ## Constructing pipelines from individual elements
