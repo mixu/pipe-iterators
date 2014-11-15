@@ -1,6 +1,15 @@
 # pipe-iterators
 
-Functions for iterating over object mode streams: `forEach`, `map`, `mapKey`, `reduce`, `filter`, `fromArray`, `toArray`, `devnull`, `pipe`, `head`, `tail`, `pipe`, `through`, `thru`, `writable`, `readable`, `duplex`, `pipeline`.
+Like underscore for Node streams (streams2 and up).
+
+Functions for iterating over object mode streams:
+
+- [Iteration functions](#iteration-functions): [`forEach`](#foreach), [`map`](#map), [`reduce`](#reduce), [`filter`](#filter), [`mapKey`](#mapkey)
+- [Input and output](#input-and-output): [`fromArray`](#fromarray), [`toArray`](#toarray),
+- [Constructing streams](#constructing-streams): [`through` / `thru`](#thru--through), [`writable`](#writable), [`readable`](#readable), [`duplex`](#duplex), [`combine`](#combine), [`devnull`](#devnull), [`cap`](#cap), [`clone`](#clone)
+- [Control flow](#control-flow): [`fork`](#fork), [`match`](#match), [`merge`](#merge), [`forkMerge`](#forkmerge), [`matchMerge`](#matchmerge), [`parallel`](#parallel)
+- [Constructing pipelines from individual elements](#constructing-pipelines-from-individual-elements): [`pipe`](#pipe), [`head`](#head), [`tail`](#tail), [`pipeline`](#pipeline)
+- [Checking stream instances](#checking-stream-instances): [`isStream`](#isstream), [`isReadable`](#isreadable), [`isWritable`](#iswritable), [`isDuplex`](#isduplex)
 
 # Installation
 
@@ -16,7 +25,7 @@ var pi = require('pipe-iterators');
 
 `v1.1.0`:
 
-- added the `merge`, `forkMerge` and `matchMerge` functions. 
+- added the `merge`, `forkMerge`, `matchMerge` and `parallel` functions.
 - fixed a bug in `pipeline`.
 
 ## Iteration functions
@@ -29,7 +38,7 @@ The iterator functions closely follow the native `Array.*` iteration API (e.g. `
 pi.forEach(callback, [thisArg])
 ```
 
-Returns a duplex stream which calls a function for each element in the stream. `callback` is invoked with two arguments - `obj` (the element value) and `index` (the element index). The return value from the callback is ignored. 
+Returns a duplex stream which calls a function for each element in the stream. `callback` is invoked with two arguments - `obj` (the element value) and `index` (the element index). The return value from the callback is ignored.
 
 If `thisArg` is provided, it is available as `this` within the callback.
 
@@ -44,7 +53,7 @@ pi.fromArray(['a', 'b', 'c'])
 pi.map(callback, [thisArg])
 ```
 
-Returns a duplex stream which produces a new stream of values by mapping each value in the stream through a transformation callback. The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). The return value from the callback is written back to the stream. 
+Returns a duplex stream which produces a new stream of values by mapping each value in the stream through a transformation callback. The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). The return value from the callback is written back to the stream.
 
 If `thisArg` is provided, it is available as `this` within the callback.
 
@@ -65,7 +74,7 @@ Reduce returns a duplex stream which boils down a stream of values into a single
 
 When the input stream ends, the stream emits the value in the accumulator.
 
-If `initialValue` is not provided, then `prev` will be equal to the first value in the array and `curr` will be equal to the second on the first call. 
+If `initialValue` is not provided, then `prev` will be equal to the first value in the array and `curr` will be equal to the second on the first call.
 
 ```js
 pi.fromArray(['a', 'b', 'c'])
@@ -80,7 +89,7 @@ pi.filter(callback, [thisArg])
 
 Returns a duplex stream which writes all values that pass (return `true` for) the test implemented by the provided `callback` function.
 
-The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). If the callback returns `true`, the element is written to the next stream, otherwise the element is filtered out. 
+The callback is invoked with two arguments, `obj` (the element value) and `index` (the element index). If the callback returns `true`, the element is written to the next stream, otherwise the element is filtered out.
 
 ```js
 pi.filter(function(post) { return !post.draft; })
@@ -93,7 +102,7 @@ pi.mapKey(key, callback, [thisArg])
 pi.mapKey(hash, [thisArg])
 ```
 
-Returns a duplex stream which produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with three arguments: `value` (the value `element[key]`), `obj` (the element itself) and `index` (the element index). The return value from the callback is set on the element, and the element itself is written back to the stream. 
+Returns a duplex stream which produces a new stream of values by mapping a single key (when given `key` and `callback`) or multiple keys (when given `hash`) through a transformation callback. The callback is invoked with three arguments: `value` (the value `element[key]`), `obj` (the element itself) and `index` (the element index). The return value from the callback is set on the element, and the element itself is written back to the stream.
 
 If `thisArg` is provided, it is available as `this` within the callback.
 
@@ -154,7 +163,7 @@ Returns a Transform stream given a set of `options`, a `transformFn` and `flushF
 - The `options` hash is passed to `stream.Transform` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_duplex_options).
 - The `transformFn` has the signature: `function (chunk, encoding, onDone) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_transform_chunk_encoding_callback) for details.
 - The `flushFn` has the signature `function(onDone)`. See the [core docs](http://nodejs.org/api/stream.html#stream_transform_flush_callback) for details.
-- `thru.obj(fn)` is a convenience wrapper around `thru({ objectMode: true }, fn)`. 
+- `thru.obj(fn)` is a convenience wrapper around `thru({ objectMode: true }, fn)`.
 - `thru.ctor()` returns a constructor for a custom Transform. This is useful when you want to use the same transform logic in multiple instances.
 
 ### writable
@@ -172,7 +181,7 @@ Has the same options as `thru`:
 - The `options` hash is passed to `stream.Writable` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_writable_options).
 - The `writeFn` has the signature: `function(chunk, encoding, callback) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_writable_write_chunk_encoding_callback_1) for details.
 - `writable.obj()` is a convenience wrapper for `writable({ objectMode: true })`.
-- `writable.ctor()` returns a constructor for the writable stream. 
+- `writable.ctor()` returns a constructor for the writable stream.
 
 ### readable
 
@@ -204,7 +213,7 @@ Returns a Duplex stream given a set of `options`, a `writeFn` and a `readFn`.
 Has the same options as `thru`:
 
 - The `options` hash is passed to `stream.Duplex` to construct the stream. See the [core docs](http://nodejs.org/api/stream.html#stream_new_stream_duplex_options).
-- The `writeFn` has the signature: `function(chunk, encoding, callback) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_writable_write_chunk_encoding_callback_1) for details. 
+- The `writeFn` has the signature: `function(chunk, encoding, callback) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_writable_write_chunk_encoding_callback_1) for details.
 - The `readFn` has the signature: `function(size) {}`. See the [core docs](http://nodejs.org/api/stream.html#stream_readable_read_size_1) for details.
 - `duplex.obj()` is a convenience wrapper for `duplex({ objectMode: true })`.
 - `duplex.ctor()` returns a constructor for the duplex stream.
@@ -215,7 +224,7 @@ Has the same options as `thru`:
 pi.combine(writableStream, readableStream)
 ```
 
-Takes a readable stream and a writable stream and returns a duplex stream. 
+Takes a readable stream and a writable stream and returns a duplex stream.
 
 Note: the two streams ARE NOT piped together. If you want to construct a pipeline with multiple streams, you can, but you need to perform the pipe operations yourself (or use the `.pipeline` function instead). This makes `.combine` work with streams where the connections is not via a pipe mechanism, like with `child_process.spawn`:
 
@@ -267,7 +276,7 @@ Returns a duplex stream. Inputs written to the stream are written to all of the 
 
 Every forked stream receives a clone of the original input object. Cloning prevents annoying issues that might occur when one fork stream modifies an object that is shared among multiple forked streams.
 
-Also accepts a single array of streams as the first parameter. 
+Also accepts a single array of streams as the first parameter.
 
 Listeners for the `error` event on the stream returned from `fork` will receive errors that are emitted in any of the streams in passed to the function.
 
@@ -280,7 +289,7 @@ pi.match([ condition1, stream1, condition2, stream2, ..., rest ])
 
 Allows you to construct `if-else` style conditionals which split a stream into multiple substreams based on a condition.
 
-Returns a writable stream given a series of `condition` function and `stream` pairs. When elements are written to the stream, they are matched against each condition function in order. 
+Returns a writable stream given a series of `condition` function and `stream` pairs. When elements are written to the stream, they are matched against each condition function in order.
 
 The `condition` function is called with two arguments - `obj` (the element value) and `index` (the element index). If the condition returns `true`, the element is written to the associated stream and no further matches are performed.
 
@@ -290,22 +299,22 @@ Listeners for the `error` event on the stream returned from `match` will receive
 
 ```js
 pi.fromArray([
-  { url: '/people' }, 
+  { url: '/people' },
   { url: '/posts/1' }, { url: '/posts' },
   { url: '/comments/2' }])
   .pipe(pi.match(
     function(req) { return /^\/people.*$/.test(req.url); },
     pi.pipeline(
-        pi.forEach(function(obj) { console.log('person!', obj); }), 
+        pi.forEach(function(obj) { console.log('person!', obj); }),
         pi.devNull()
     ),
     function(req) { return /^\/posts.*$/.test(req.url); },
     pi.pipeline(
-        pi.forEach(function(obj) { console.log('post!', obj); }), 
+        pi.forEach(function(obj) { console.log('post!', obj); }),
         pi.devNull()
     ),
     pi.pipeline(
-        pi.forEach(function(obj) { console.log('other:', obj); }), 
+        pi.forEach(function(obj) { console.log('other:', obj); }),
         pi.devNull()
     )
   ));
@@ -332,17 +341,17 @@ Fork followed by merge on a set of streams. Accepts any number of duplex streams
 - `fork`s each input, writes each input into the streams,
 - reads and `merge`s the inputs from the streams and writes them out
 
-Useful if you need to concurrently apply different operations on a single input but want to produce a single merged output. 
+Useful if you need to concurrently apply different operations on a single input but want to produce a single merged output.
 
 ```
            / to-html() \
 read .md() - to-pdf()  - write-to-disk()
-           \ to-rtf()  / 
+           \ to-rtf()  /
 ```
 
 For example, imagine converting a set of Markdown files into the HTML, PDF and RTF formats - the same file goes in, each of the processing operations are applied, but at the end there are three objects (binary files in the different formats) that go into the same "write to disk" pipeline.
 
-### matchMerge 
+### matchMerge
 
 ```js
 pi.matchMerge(condition1, stream1, [condition2], [stream2], [...], [rest])
@@ -390,7 +399,7 @@ pi.pipe([ stream1, stream2, ...])
 
 Given a series of streams, calls `.pipe()` for each stream in sequence and returns an array which contains all the streams. Used by `head()` and `tail()`.
 
-Also accepts a single array of streams as the first parameter. 
+Also accepts a single array of streams as the first parameter.
 
 ### head()
 
@@ -401,9 +410,9 @@ pi.head([ stream1, stream2, ... ])
 
 Given a series of streams, calls `.pipe()` for each stream in sequence and returns the first stream in the series.
 
-Also accepts a single array of streams as the first parameter. 
+Also accepts a single array of streams as the first parameter.
 
-Similar to `a.pipe(b).pipe(c)`, but `.head()` returns the first stream (`a`) rather than the last stream (`c`). 
+Similar to `a.pipe(b).pipe(c)`, but `.head()` returns the first stream (`a`) rather than the last stream (`c`).
 
 ### tail()
 
@@ -414,7 +423,7 @@ pi.tail([ stream1, stream2, ... ])
 
 Given a series of streams, calls `.pipe()` for each stream in sequence and returns the last stream in the series.
 
-Also accepts a single array of streams as the first parameter. 
+Also accepts a single array of streams as the first parameter.
 
 Just like calling `a.pipe(b).pipe(c)`.
 
@@ -486,7 +495,7 @@ Returns true if a stream provides both the Readable and Writable stream interfac
 
 ## What about asynchronous iteration?
 
-Meh, `through2` streams already make writing async iteration quite easy. 
+Meh, `through2` streams already make writing async iteration quite easy.
 
 ## What about splitting strings?
 
