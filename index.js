@@ -150,6 +150,9 @@ exports.combine = function(writable, readable) {
   }
 
   var stream = exports.duplex.obj(function(chunk, enc, done) {
+        if (!writable.writable) {
+          return done(); // if the stream has already ended, stop writing to it
+        }
         // Node 0.8.x writable streams do not accept the third parameter, done
         var ok = writable.write(chunk, enc);
         if (ok) {
@@ -332,8 +335,12 @@ exports.tail = function() {
 };
 
 exports.pipeline = function() {
-  var streams = exports.pipe((Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments))),
-      last = streams[streams.length - 1],
+  var streams = exports.pipe((Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments)));
+  if (streams.length === 1) {
+    return streams[0];
+  }
+
+  var last = streams[streams.length - 1],
       isDuplex = isStream.isDuplex(last),
       head = isDuplex ? exports.combine(streams[0], last) : exports.cap(streams[0]);
 
