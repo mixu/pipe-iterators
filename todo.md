@@ -11,3 +11,6 @@
 - .httpGet(): duplex, reads objs from HTTP
 - .httpsGet(): duplex, reads objs from HTTPS
 
+# Auto error wrapping
+
+- to make debugging easier, some kind of auto-try-catch mode
