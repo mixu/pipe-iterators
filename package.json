@@ -1,6 +1,6 @@
 {
   "name": "pipe-iterators",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Like underscore for Node streams. Map, reduce, filter, fork, pipeline and other utility functions for iterating over object mode streams.",
   "main": "index.js",
   "scripts": {
