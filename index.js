@@ -124,6 +124,51 @@ exports.toArray = function(fn) {
   return stream;
 };
 
+exports.fromAsync = function(callable) {
+  var called = false;
+  var returned = false;
+  var eof = false;
+  var arr;
+  var stream;
+
+  function read() {
+    var item;
+    if (!called) {
+      callable(function(err, results) {
+        returned = true;
+        if (err) {
+          stream.emit('error', err);
+          eof = true;
+          stream.push(null);
+          return;
+        }
+        arr = Array.isArray(results) ? results : [results];
+        read();
+      });
+      called = true;
+      return;
+    }
+    if (!returned) {
+      return;
+    }
+
+    if (arr.length > 0) {
+      do {
+        item = arr.shift();
+      } while(typeof item !== 'undefined' && stream.push(item))
+    }
+    if (arr.length === 0 && !eof) {
+      // pushing null signals EOF
+      eof = true;
+      stream.push(null);
+    }
+  }
+
+  stream = exports.readable.obj(read);
+
+  return stream;
+}
+
 // Constructing streams
 
 exports.thru = exports.through = through;

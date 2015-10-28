@@ -5,7 +5,7 @@ Like underscore for Node streams (streams2 and up).
 Functions for iterating over object mode streams:
 
 - [Iteration functions](#iteration-functions): [`forEach`](#foreach), [`map`](#map), [`reduce`](#reduce), [`filter`](#filter), [`mapKey`](#mapkey)
-- [Input and output](#input-and-output): [`fromArray`](#fromarray), [`toArray`](#toarray)
+- [Input and output](#input-and-output): [`fromArray`](#fromarray), [`toArray`](#toarray), [`fromAsync`](#fromasync)
 - [Constructing streams](#constructing-streams): [`through` / `thru`](#thru--through), [`writable`](#writable), [`readable`](#readable), [`duplex`](#duplex), [`combine`](#combine), [`devnull`](#devnull), [`cap`](#cap), [`clone`](#clone)
 - [Control flow](#control-flow): [`fork`](#fork), [`match`](#match), [`merge`](#merge), [`forkMerge`](#forkmerge), [`matchMerge`](#matchmerge), [`parallel`](#parallel)
 - [Constructing pipelines from individual elements](#constructing-pipelines-from-individual-elements): [`pipe`](#pipe), [`head`](#head), [`tail`](#tail), [`pipeline`](#pipeline)
@@ -145,6 +145,18 @@ pi.toArray(array)
 Returns a writable stream which buffers the input it receives into an array. When the stream emits `end`, the `callback` is called with one parameter - the array which contains the input elements written to the the stream.
 
 You can also pass an instance of an array instead of a callback. The array's contents will be updated with the elements from the stream when the writable stream emits `finish`.
+
+### fromAsync
+
+```js
+pi.fromAsync(fn)
+```
+
+Returns a readable stream given an async function. (since `v1.2.0`)
+
+The async function should accept one argument, `onDone`, which is a `function(err, results)`. The function is called once - the first time someone reads from the stream. It should return either a single result, or an array of results.
+
+The stream will emit one item for each item in the result (the single result, or each array item individually), and then emit end.
 
 ## Constructing streams
 
