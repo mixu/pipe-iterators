@@ -17,17 +17,17 @@
     "through2",
     "streams"
   ],
-  "license": "BSD",
+  "license": "BSD-3-Clause",
   "bugs": {
     "url": "https://github.com/mixu/pipe-iterators/issues"
   },
   "homepage": "https://github.com/mixu/pipe-iterators",
   "dependencies": {
-    "clone": "0.1.18",
-    "merge-stream": "1.0.0",
+    "clone": "~1.0.2",
+    "merge-stream": "~1.0.0",
     "miniq": "~1.0.0",
-    "readable-stream": "*",
-    "through2": "*",
-    "xtend": "4.0.0"
+    "readable-stream": "~2.0.6",
+    "through2": "~2.0.1",
+    "xtend": "~4.0.1"
   }
 }

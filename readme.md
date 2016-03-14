@@ -23,6 +23,10 @@ var pi = require('pipe-iterators');
 
 ## Changelog
 
+`v1.3.0`: Updated dependencies to more recent versions - thanks @asgoth!
+
+`v1.2.0`: added pi.fromAsync(callable)
+
 `v1.1.0`:
 
 - added the `merge`, `forkMerge`, `matchMerge` and `parallel` functions.
