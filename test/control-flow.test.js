@@ -14,7 +14,8 @@ describe('match', function() {
           function(obj) { return obj % 2 == 0; },
           pi.toArray(twos),
           function(obj) { return obj % 3 == 0; },
-          pi.toArray(threes)
+          pi.toArray(threes),
+          pi.devnull()
         );
 
     assert.ok(isWritable(result));
@@ -33,7 +34,8 @@ describe('match', function() {
     var twos = [],
         result = pi.match(
           function(obj) { return obj % 2 == 0; },
-          pi.toArray(twos)
+          pi.toArray(twos),
+          pi.devnull()
         );
 
     assert.ok(isWritable(result));
