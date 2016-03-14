@@ -24,7 +24,7 @@
   "homepage": "https://github.com/mixu/pipe-iterators",
   "dependencies": {
     "clone": "0.1.18",
-    "merge-stream": "0.1.6",
+    "merge-stream": "1.0.0",
     "miniq": "~1.0.0",
     "readable-stream": "*",
     "through2": "*",
